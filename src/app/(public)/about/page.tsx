@@ -150,13 +150,13 @@ export default function AboutPage() {
                     Grow With Us
                 </p>
                 <h2 className="font-serif text-4xl md:text-5xl text-black uppercase tracking-tight leading-none mb-6">
-                    The Partner Network
+                    Your Golden Network
                 </h2>
                 <p className="text-sm text-gray-500 font-medium max-w-2xl mx-auto leading-relaxed mb-10">
-                    Luxey isn&apos;t just a marketplace — it&apos;s a network. Refer
-                    friends, earn commissions up to 5 levels deep, and unlock higher
-                    status tiers that reduce your platform fees. The more you grow, the
-                    more you earn.
+                    Luxey isn&apos;t just a marketplace — it&apos;s a network. As you refer
+                    your friends and grow your volumes, you unlock higher status tiers
+                    that reduce platform fees and increase commissions. The more you
+                    help us grow, the more you earn.
                 </p>
 
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-4 max-w-3xl mx-auto">
