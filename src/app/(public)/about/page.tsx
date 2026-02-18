@@ -158,31 +158,6 @@ export default function AboutPage() {
                     that reduce platform fees and increase commissions. The more you
                     help us grow, the more you earn.
                 </p>
-
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 max-w-3xl mx-auto">
-                    {[
-                        { tier: "Bronze", vol: "$25k", color: "#A0522D" },
-                        { tier: "Silver", vol: "$75k", color: "#808080" },
-                        { tier: "Gold", vol: "$150k", color: "#D4AF37" },
-                        { tier: "Platinum", vol: "$300k", color: "#5F9EA0" },
-                        { tier: "Titanium", vol: "$500k", color: "#444444" },
-                    ].map((t) => (
-                        <div
-                            key={t.tier}
-                            className="bg-white border border-[#E4E4E4] rounded-sm p-4 text-center hover:border-[#D4AF37] transition-colors"
-                        >
-                            <p
-                                className="text-lg font-black uppercase mb-1"
-                                style={{ color: t.color }}
-                            >
-                                {t.tier}
-                            </p>
-                            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">
-                                {t.vol}/mo
-                            </p>
-                        </div>
-                    ))}
-                </div>
             </section>
 
             {/* CTA */}
