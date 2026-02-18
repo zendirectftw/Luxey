@@ -61,26 +61,34 @@ export default function AboutPage() {
                             {
                                 label: "Secure Vault Storage",
                                 desc: "Our fully-insured, world-class vault is safeguarded 24/7.",
+                                icon: "🛡️",
                             },
                             {
                                 label: "Status Tier Progression",
                                 desc: "From Bronze to Titanium — earn lower fees and higher commissions as you grow.",
+                                icon: "📈",
                             },
                             {
                                 label: "Referral Commissions",
                                 desc: "Earn up to 35% of platform fees generated from your referral network, paid monthly.",
+                                icon: "🤝",
                             },
                         ].map((item) => (
                             <div
                                 key={item.label}
                                 className="bg-white border border-[#E4E4E4] rounded-sm p-6 hover:border-[#D4AF37] transition-colors"
                             >
-                                <h3 className="text-[11px] font-black uppercase tracking-widest text-black mb-1">
-                                    {item.label}
-                                </h3>
-                                <p className="text-xs text-gray-400 font-medium leading-relaxed">
-                                    {item.desc}
-                                </p>
+                                <div className="flex items-start gap-4">
+                                    <div className="text-2xl">{item.icon}</div>
+                                    <div>
+                                        <h3 className="text-[11px] font-black uppercase tracking-widest text-black mb-1">
+                                            {item.label}
+                                        </h3>
+                                        <p className="text-xs text-gray-400 font-medium leading-relaxed">
+                                            {item.desc}
+                                        </p>
+                                    </div>
+                                </div>
                             </div>
                         ))}
                     </div>
