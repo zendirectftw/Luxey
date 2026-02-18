@@ -9,7 +9,7 @@ import { useFavorites } from "@/context/FavoritesContext";
 
 const heroSlides = [
     {
-        title: "1 oz PAMP Lady Fortuna",
+        title: "PAMP Suisse Lady Fortuna",
         subtitle: "The World's Most Trusted Gold Bar",
         image: "/hero-pamp-fortuna.png",
         cta: "View Product",
@@ -24,7 +24,7 @@ const heroSlides = [
     },
     {
         title: "Canadian Gold Maple Leaf",
-        subtitle: ".9999 Fine Gold — Purest in the World",
+        subtitle: "Beauty Meets Four Nines Purity",
         image: "/hero-maple-leaf.png",
         cta: "View Product",
         href: "/product/canadian-maple-1oz",
