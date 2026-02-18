@@ -98,7 +98,7 @@ export default function HomePage() {
                                         alt={slide.title}
                                         width={320}
                                         height={320}
-                                        className="object-contain drop-shadow-2xl"
+                                        className="object-contain drop-shadow-2xl border-2 border-[#D4AF37]/60 rounded-lg"
                                         priority={idx === 0}
                                     />
                                 </div>
