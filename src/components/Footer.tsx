@@ -55,7 +55,7 @@ export default function Footer() {
                         </Link>
                     </div>
                     <div className="text-[9px] font-black uppercase tracking-widest text-[#D4AF37] opacity-60">
-                        Verified Exchange • Denver Vault
+                        Real-Time Exchange • Secure Vault
                     </div>
                 </div>
             </div>

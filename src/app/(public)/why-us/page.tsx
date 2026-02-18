@@ -140,12 +140,12 @@ export default function WhyUsPage() {
                             href="/explore"
                             className="inline-block bg-black text-white px-8 py-3 text-[11px] font-black uppercase tracking-widest hover:bg-zinc-800 transition-colors"
                         >
-                            Start Browsing
+                            Learn More
                         </Link>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                         {[
-                            { label: "Insured Storage", icon: "🔒" },
+                            { label: "Fully Insured Storage", icon: "🔒" },
                             { label: "Serial Tracking", icon: "📋" },
                             { label: "Physically Segregated", icon: "🛡️" },
                             { label: "24/7 Monitor", icon: "👁️" },
@@ -170,7 +170,7 @@ export default function WhyUsPage() {
                     Ready to Start?
                 </p>
                 <h3 className="font-serif text-3xl md:text-4xl text-white uppercase tracking-tight leading-none mb-8">
-                    Join the Fastest Precious Metals Exchange
+                    Join the Real-Time Precious Metals Exchange
                 </h3>
                 <div className="flex gap-4 justify-center flex-wrap">
                     <Link
