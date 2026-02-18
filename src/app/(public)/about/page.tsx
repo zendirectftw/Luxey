@@ -66,12 +66,12 @@ export default function AboutPage() {
                             {
                                 label: "Status Tier Progression",
                                 desc: "From Bronze to Titanium — earn lower fees and higher commissions as you grow.",
-                                icon: "📈",
+                                icon: "🪜",
                             },
                             {
                                 label: "Referral Commissions",
                                 desc: "Earn up to 35% of platform fees generated from your referral network, paid monthly.",
-                                icon: "🤝",
+                                icon: "💲",
                             },
                         ].map((item) => (
                             <div
