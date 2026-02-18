@@ -47,10 +47,10 @@ export default function ExplorePage() {
             {/* Header */}
             <header className="mb-10">
                 <h1 className="font-serif text-5xl md:text-6xl text-black tracking-tight uppercase leading-none mb-3">
-                    Explore
+                    Marketplace
                 </h1>
                 <p className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400">
-                    Browse our complete catalog of certified precious metals
+                    Explore our catalog of certified precious metals
                 </p>
             </header>
 
