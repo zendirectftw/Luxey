@@ -23,7 +23,7 @@ export default function AboutPage() {
                     <p className="text-sm md:text-base text-zinc-400 font-medium max-w-2xl mx-auto leading-relaxed">
                         Luxey was founded with a single mission: make it radically easy to
                         build wealth through physical ownership of gold and precious metals.
-                        We believe gold and silver should be as accessible as any other asset class.
+                        We believe gold and silver can be just as accessible as any other asset class.
                     </p>
                 </div>
 
