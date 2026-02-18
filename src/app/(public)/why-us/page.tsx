@@ -99,7 +99,7 @@ export default function WhyUsPage() {
                             {
                                 step: "03",
                                 title: "Ship",
-                                desc: "Sellers get near-instant shipping labels. Buyers receive insured delivery or products are immediately added to your Luxey Locker.",
+                                desc: <>Sellers get near-instant shipping labels. Buyers receive insured delivery or products are immediately added to your <span style={{ letterSpacing: '0.2em' }} className="font-black">LUXEY LOCKER</span>.</>,
                             },
                             {
                                 step: "04",
@@ -134,7 +134,7 @@ export default function WhyUsPage() {
                             Your Metals.<br />Our Vault.
                         </h2>
                         <p className="text-sm text-gray-500 font-medium leading-relaxed mb-8">
-                            Secure your wealth with confidence. Every item purchased may be stored in your LUXEY LOCKER, held within our world-class, 24/7 safeguarded, and fully insured vault. Your precious metals are always physically segregated from other clients. Meticulous serial number tracking and auditing ensure your investments are always protected and verified.
+                            Secure your wealth with confidence. Every item purchased may be stored in your <span style={{ letterSpacing: '0.2em' }} className="font-black">LUXEY LOCKER</span>, held within our world-class, 24/7 safeguarded, and fully insured vault. Your precious metals are always physically segregated from other clients. Meticulous serial number tracking and auditing ensure your investments are always protected and verified.
                         </p>
                         <Link
                             href="/explore"
