@@ -138,14 +138,7 @@ export default function HomePage() {
             <section className="max-w-7xl mx-auto w-full py-10 px-6">
                 {/* Header + Search */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-                    <div>
-                        <h2 className="font-serif text-4xl md:text-5xl text-black tracking-tight uppercase leading-none mb-2">
-                            Marketplace
-                        </h2>
-                        <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-gray-400">
-                            Real-time Bid & Ask — Updated Every 30 Seconds
-                        </p>
-                    </div>
+                    <div />
 
                     {/* Search */}
                     <div className="relative w-full md:w-72">
@@ -185,8 +178,8 @@ export default function HomePage() {
                                 setShowFavoritesOnly(false);
                             }}
                             className={`px-5 py-2 text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all rounded-sm ${activeCategory === cat && !activeWeight && !showFavoritesOnly
-                                    ? "bg-black text-white"
-                                    : "bg-white text-gray-600 border border-[#E4E4E4] hover:border-black"
+                                ? "bg-black text-white"
+                                : "bg-white text-gray-600 border border-[#E4E4E4] hover:border-black"
                                 }`}
                         >
                             {cat}
@@ -210,8 +203,8 @@ export default function HomePage() {
                                 }
                             }}
                             className={`px-5 py-2 text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all rounded-sm ${activeWeight === wf
-                                    ? "bg-black text-white"
-                                    : "bg-white text-gray-600 border border-[#E4E4E4] hover:border-black"
+                                ? "bg-black text-white"
+                                : "bg-white text-gray-600 border border-[#E4E4E4] hover:border-black"
                                 }`}
                         >
                             {wf}
@@ -228,8 +221,8 @@ export default function HomePage() {
                             }
                         }}
                         className={`w-9 h-9 shrink-0 rounded-full border flex items-center justify-center transition-all ${showFavoritesOnly
-                                ? "bg-red-50 border-red-300 text-red-500"
-                                : "bg-white border-[#E4E4E4] text-gray-400 hover:border-red-300 hover:text-red-400"
+                            ? "bg-red-50 border-red-300 text-red-500"
+                            : "bg-white border-[#E4E4E4] text-gray-400 hover:border-red-300 hover:text-red-400"
                             }`}
                         aria-label="Show favorites"
                         title={`Favorites${favCount > 0 ? ` (${favCount})` : ""}`}
