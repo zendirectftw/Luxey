@@ -24,7 +24,7 @@ const heroSlides = [
     },
     {
         title: "Canadian Gold Maple Leaf",
-        subtitle: "Beauty Meets Four Nines Purity",
+        subtitle: "Exquisite Beauty Meets Four 9s Purity",
         image: "/hero-maple-leaf.png",
         cta: "View Product",
         href: "/product/canadian-maple-1oz",
