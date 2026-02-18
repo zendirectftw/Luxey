@@ -1,26 +1,598 @@
 @import "tailwindcss";
 
+/* ═══════════════════════════════════════════
+   LUXEY© DESIGN SYSTEM
+   Gold Marketplace — Speed is our brand
+   ═══════════════════════════════════════════ */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --luxey-gold: #D4AF37;
+  --luxey-gold-light: rgba(212, 175, 55, 0.15);
+  --luxey-gold-glow: rgba(212, 175, 55, 0.3);
+  --luxey-black: #000000;
+  --luxey-white: #FFFFFF;
+  --luxey-bg: #FAFAFA;
+  --luxey-border: #E4E4E4;
+  --luxey-border-light: #F5F5F5;
+  --luxey-text: #000000;
+  --luxey-text-muted: #666666;
+  --luxey-text-subtle: #999999;
+  --luxey-green: #16a34a;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-luxey-gold: var(--luxey-gold);
+  --color-luxey-bg: var(--luxey-bg);
+  --color-luxey-border: var(--luxey-border);
+  --color-luxey-border-light: var(--luxey-border-light);
+  --color-luxey-green: var(--luxey-green);
+  --font-sans: 'Inter', sans-serif;
+  --font-serif: 'Cormorant Garamond', serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* ── Base ──────────────────────────────── */
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: var(--luxey-bg);
+  color: var(--luxey-text);
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.font-serif {
+  font-family: 'Cormorant Garamond', serif;
+}
+
+/* ── Scrollbar Hide ───────────────────── */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* ── Logo ─────────────────────────────── */
+.nav-logo-text {
+  font-size: 2.8rem;
+  line-height: 1;
+  letter-spacing: -0.05em;
+}
+
+/* ── Luxey CTA Button ─────────────────── */
+.luxey-cta {
+  position: relative;
+  background-color: #000;
+  color: #FFF;
+  padding: 10px 20px;
+  border-radius: 0.125rem;
+  font-size: 0.75rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 2px solid transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.luxey-cta:hover {
+  border-color: var(--luxey-gold);
+  box-shadow: 0 0 15px var(--luxey-gold-glow);
+}
+
+.cta-bolt-circle {
+  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  opacity: 0;
+  transform: scale(0.4);
+  border: 2px solid var(--luxey-gold);
+  border-radius: 50%;
+  position: absolute;
+  width: 26px;
+  height: 26px;
+  left: 50%;
+  top: 50%;
+  margin-left: -13px;
+  margin-top: -13px;
+}
+
+.luxey-cta:hover .cta-bolt-circle {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.cta-bolt {
+  color: var(--luxey-gold);
+  font-size: 1rem;
+  z-index: 10;
+  position: relative;
+  transform: translateX(1px);
+}
+
+/* ── Status Pills ─────────────────────── */
+.status-pill {
+  padding: 4px 10px;
+  border-radius: 2px;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border: 1px solid var(--luxey-border);
+  display: inline-block;
+}
+
+.status-pill-gold {
+  background: linear-gradient(135deg, #000 0%, #222 100%);
+  color: var(--luxey-gold);
+  padding: 4px 16px;
+  border-radius: 2px;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.15em;
+  border: 1px solid var(--luxey-gold);
+}
+
+.pill-gold {
+  color: var(--luxey-gold);
+  background: #000;
+  border-color: var(--luxey-gold);
+}
+
+.pill-silver {
+  color: #666;
+  background: #EEE;
+}
+
+.pill-bronze {
+  color: #854d0e;
+  background: #fefce8;
+}
+
+.pill-complete {
+  color: var(--luxey-green);
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.pill-progress {
+  color: #b45309;
+  background: #fffbeb;
+  border-color: #fde68a;
+}
+
+.pill-pending {
+  color: #6b7280;
+  background: #f3f4f6;
+  border-color: #d1d5db;
+}
+
+/* ── Form Styles ──────────────────────── */
+.form-label {
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: #888;
+  margin-bottom: 8px;
+  display: block;
+}
+
+.form-input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid var(--luxey-border);
+  border-radius: 2px;
+  font-size: 14px;
+  font-weight: 500;
+  outline: none;
+  transition: all 0.2s;
+  background: #FFF;
+}
+
+.form-input:focus {
+  border-color: #000;
+  box-shadow: 0 0 0 1px #000;
+}
+
+/* ── Dropdown ─────────────────────────── */
+.dropdown-item {
+  display: block;
+  padding: 12px 20px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #666;
+  border-bottom: 1px solid var(--luxey-border-light);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  transition: all 0.15s;
+}
+
+.dropdown-item:hover {
+  color: var(--luxey-gold);
+  background: var(--luxey-bg);
+}
+
+.dropdown-item.active {
+  color: var(--luxey-gold);
+  background: #f9fafb;
+  border-left: 4px solid var(--luxey-gold);
+  font-weight: 900;
+}
+
+/* ── Table Row Hovers ─────────────────── */
+.table-row-hover:hover {
+  background-color: #FFF;
+  box-shadow: inset 4px 0 0 var(--luxey-gold);
+}
+
+/* ── Price Colors ─────────────────────── */
+.price-green {
+  color: var(--luxey-green);
+}
+
+.price-red {
+  color: #dc2626;
+}
+
+/* ── Print Styles ─────────────────────── */
+@media print {
+
+  nav,
+  footer,
+  .no-print {
+    display: none !important;
+  }
+
+  body {
+    background: white;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* ── Animations ───────────────────────── */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-down {
+  animation: slideDown 0.2s ease-out forwards;
+}
+
+/* ── Account Page Utilities ──────────── */
+.stat-card {
+  background: white;
+  border: 1px solid var(--luxey-border);
+  padding: 1.5rem;
+  border-radius: 4px;
+  transition: all 0.3s ease;
+}
+
+.stat-card:hover {
+  border-color: var(--luxey-gold);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+}
+
+/* ── Action Buttons (Tables) ─────────── */
+.action-btn {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 8px 12px;
+  border: 1px solid var(--luxey-border);
+  background: white;
+  transition: all 0.2s;
+  border-radius: 2px;
+  white-space: nowrap;
+}
+
+.action-btn:hover {
+  border-color: var(--luxey-gold);
+  color: var(--luxey-gold);
+}
+
+.action-btn-primary {
+  border-color: #000;
+  color: #000;
+}
+
+.action-btn-primary:hover {
+  background-color: #000;
+  color: #FFF;
+}
+
+/* ── Locker Slot Rows ────────────────── */
+.slot-row {
+  transition: all 0.2s ease;
+  border-left: 4px solid transparent;
+}
+
+.slot-row:hover:not(.slot-empty) {
+  background-color: #FFF;
+  border-left-color: var(--luxey-gold);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+}
+
+/* ── Vault Action Buttons ────────────── */
+.vault-action-btn {
+  font-size: 9px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  padding: 10px 20px;
+  border-radius: 2px;
+  border: 2px solid #000;
+  background-color: #FFF;
+  color: #000;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
+  width: 160px;
+  text-align: center;
+}
+
+.vault-action-btn:hover {
+  border-color: var(--luxey-gold);
+  color: var(--luxey-gold);
+  box-shadow: 0 4px 10px rgba(212, 175, 55, 0.15);
+}
+
+/* ── Custom Select (Gold Chevron) ────── */
+.luxey-select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23D4AF37' stroke-width='3'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19.5 8.25l-7.5 7.5-7.5-7.5' /%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 1rem center;
+  background-size: 1rem;
+}
+
+/* ── Progress Track (Status Tier) ────── */
+.progress-track {
+  height: 8px;
+  background-color: var(--luxey-border);
+  border-radius: 10px;
+  position: relative;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #BF953F, #FCF6BA, #B38728);
+  border-radius: 10px;
+  box-shadow: 0 0 15px rgba(212, 175, 55, 0.4);
+}
+
+/* ── Row Hovers (Tables) ─────────────── */
+.payment-row:hover {
+  background-color: #FFF;
+  box-shadow: inset 4px 0 0 var(--luxey-gold);
+}
+
+.commission-row:hover {
+  background-color: #FAFAFA;
+}
+
+.tier-row:hover {
+  background-color: #FFF;
+  border-color: var(--luxey-gold);
+}
+
+/* ── Rounded Status Pills ────────────── */
+.status-progress {
+  background-color: #FFF7ED;
+  color: #C2410C;
+  border: 1px solid #FFEDD5;
+  border-radius: 20px;
+}
+
+.status-complete {
+  background-color: #F0FDF4;
+  color: #15803d;
+  border: 1px solid #DCFCE7;
+  border-radius: 20px;
+}
+
+.status-released {
+  background-color: #F0FDF4;
+  color: #15803d;
+  border-color: #DCFCE7;
+}
+
+.status-pending-pill {
+  background-color: #FAFAFA;
+  color: #666;
+  border-color: var(--luxey-border);
+}
+
+/* ── Tier Metal Colors ───────────────── */
+.color-bronze {
+  color: #A0522D;
+}
+
+.color-silver {
+  color: #808080;
+}
+
+.color-gold {
+  color: #D4AF37;
+}
+
+.color-platinum {
+  color: #5F9EA0;
+}
+
+.color-titanium {
+  color: #444444;
+}
+
+/* ── Growth Indicators ───────────────── */
+.growth-up {
+  color: var(--luxey-green);
+  font-size: 0.75rem;
+  font-weight: 800;
+  margin-left: 8px;
+}
+
+.growth-down {
+  color: #ef4444;
+  font-size: 0.75rem;
+  font-weight: 800;
+  margin-left: 8px;
+}
+
+/* ── Volume Box (Status Hero) ────────── */
+.volume-box {
+  display: inline-block;
+  padding: 12px 24px;
+  border: 1px solid #333;
+  background-color: #0a0a0a;
+  border-radius: 2px;
+  min-width: 240px;
+}
+
+/* ── Status Hero Card ────────────────── */
+.status-hero-card {
+  background: #000;
+  color: #FFF;
+  padding: 3rem;
+  border-radius: 4px;
+  position: relative;
+  overflow: hidden;
+  border: 2px solid var(--luxey-gold);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+}
+
+/* ── PO Paper Document ───────────────── */
+.po-paper {
+  background-color: #fff;
+  width: 8.5in;
+  min-height: 11in;
+  margin: 2rem auto;
+  padding: 0.75in;
+  box-shadow: 0 0 30px rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--luxey-border);
+  position: relative;
+}
+
+.watermark {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-45deg);
+  font-size: 8rem;
+  color: rgba(0, 0, 0, 0.02);
+  pointer-events: none;
+  text-transform: uppercase;
+  font-weight: 900;
+  width: 100%;
+  text-align: center;
+  line-height: 1;
+}
+
+/* ═══════════════════════════════════════
+   ADMIN PORTAL
+   ═══════════════════════════════════════ */
+
+.sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #666;
+  transition: all 0.2s;
+  border-left: 4px solid transparent;
+}
+
+.sidebar-link.active,
+.sidebar-link-active {
+  color: #000;
+  background: #fff;
+  border-left-color: var(--luxey-gold);
+}
+
+.sidebar-link:hover:not(.active):not(.sidebar-link-active) {
+  color: #000;
+  background: #f0f0f0;
+}
+
+.img-card {
+  position: relative;
+  border: 1px solid var(--luxey-border);
+  padding: 8px;
+  background: white;
+  transition: border-color 0.3s;
+}
+
+.img-card.is-default {
+  border: 2px solid var(--luxey-gold);
+}
+
+.default-badge {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--luxey-gold);
+  color: white;
+  font-size: 8px;
+  font-weight: 900;
+  padding: 2px 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  border-radius: 10px;
+  display: none;
+}
+
+.is-default .default-badge {
+  display: block;
+}
+
+.luxey-checkbox {
+  width: 20px;
+  height: 20px;
+  accent-color: #000;
+  cursor: pointer;
+}
+
+.admin-stat {
+  background: white;
+  border: 1px solid var(--luxey-border);
+  padding: 2rem;
+  border-radius: 2px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  transition: border-color 0.3s;
+}
+
+.admin-stat:hover {
+  border-color: var(--luxey-gold);
 }
