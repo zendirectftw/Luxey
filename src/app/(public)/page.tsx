@@ -126,49 +126,15 @@ export default function HomePage() {
             <div className="bg-[#D4AF37] py-3 px-6">
                 <div className="max-w-7xl mx-auto flex justify-between items-center">
                     <p className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] text-black">
-                        The Fastest Way to Source Physical Precious Metals
-                    </p>
-                    <p className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-black/60 hidden md:block">
-                        Fastest Labels • Fastest Payouts • Verified Vault
+                        The Best Way to Source Physical Gold and Precious Metals
                     </p>
                 </div>
             </div>
 
             {/* ═══ MARKETPLACE SECTION ═══ */}
             <section className="max-w-7xl mx-auto w-full py-10 px-6">
-                {/* Header + Search */}
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-                    <div />
-
-                    {/* Search */}
-                    <div className="relative w-full md:w-72">
-                        <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            width="16"
-                            height="16"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                        >
-                            <circle cx="11" cy="11" r="8" />
-                            <path d="m21 21-4.3-4.3" />
-                        </svg>
-                        <input
-                            type="text"
-                            placeholder="Search products..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full pl-10 pr-4 py-3 border border-[#E4E4E4] rounded-sm text-sm font-medium focus:border-black focus:outline-none transition-colors bg-white"
-                        />
-                    </div>
-                </div>
-
-                {/* Category Filters */}
-                <div className="flex gap-2 mb-8 overflow-x-auto no-scrollbar pb-2 items-center">
+                {/* Filters + Search */}
+                <div className="flex flex-wrap gap-2 mb-8 items-center">
                     {categories.map((cat) => (
                         <button
                             key={cat}
@@ -211,6 +177,17 @@ export default function HomePage() {
                         </button>
                     ))}
 
+                    {/* Separator */}
+                    <div className="h-6 w-px bg-[#E4E4E4] mx-1 shrink-0" />
+
+                    {/* Big Box Link */}
+                    <Link
+                        href="/big-box"
+                        className="px-5 py-2 text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all rounded-sm bg-white text-gray-600 border border-[#E4E4E4] hover:border-black"
+                    >
+                        Big Box
+                    </Link>
+
                     {/* Favorites Filter */}
                     <button
                         onClick={() => {
@@ -241,6 +218,32 @@ export default function HomePage() {
                             <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
                         </svg>
                     </button>
+
+                    {/* Search — pushed to right */}
+                    <div className="relative w-full md:w-60 md:ml-auto shrink-0">
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                        >
+                            <circle cx="11" cy="11" r="8" />
+                            <path d="m21 21-4.3-4.3" />
+                        </svg>
+                        <input
+                            type="text"
+                            placeholder="Search products..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2 border border-[#E4E4E4] rounded-sm text-sm font-medium focus:border-black focus:outline-none transition-colors bg-white"
+                        />
+                    </div>
                 </div>
 
                 {/* Product Grid */}
