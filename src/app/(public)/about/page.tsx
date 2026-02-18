@@ -148,7 +148,7 @@ export default function AboutPage() {
                     Grow With Us
                 </p>
                 <h2 className="font-serif text-4xl md:text-5xl text-black uppercase tracking-tight leading-none mb-6">
-                    Your Golden Network
+                    Your Network is Gold
                 </h2>
                 <p className="text-sm text-gray-500 font-medium max-w-2xl mx-auto leading-relaxed mb-10">
                     Luxey isn&apos;t just a marketplace — it&apos;s a network. As you refer
@@ -161,7 +161,7 @@ export default function AboutPage() {
             {/* CTA */}
             <section className="bg-[#D4AF37] py-16 px-6 text-center">
                 <h3 className="font-serif text-3xl md:text-4xl text-black uppercase tracking-tight leading-none mb-6">
-                    Start Your Golden Journey
+                    Start Your Golden Journey Today
                 </h3>
                 <div className="flex gap-4 justify-center flex-wrap">
                     <Link
