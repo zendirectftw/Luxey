@@ -113,17 +113,17 @@ export default function AboutPage() {
                         {[
                             {
                                 title: "Transparency",
-                                desc: "Real-time bid/ask pricing. No hidden fees, no markups, no surprises. You see exactly what the market is offering.",
+                                desc: "Real-time bid/ask pricing. No hidden fees, no markups, no surprises. You see exactly what the market is offering at all times.",
                                 icon: "🔍",
                             },
                             {
                                 title: "Speed",
-                                desc: "From shipping labels to payouts, everything on Luxey is designed to be the fastest in the industry. Your time matters.",
+                                desc: "From shipping labels and payouts to client requests, everything on LUXEY is designed to be fast. Time saved is more $$$ earned.",
                                 icon: "⚡",
                             },
                             {
-                                title: "Security",
-                                desc: "Every item is stored in our insured Denver vault with tamper-proof packaging, serial tracking, and 24/7 monitoring.",
+                                title: "Secure Accuracy",
+                                desc: "Every item is stored in our world-class, 24/7 monitored and fully insured vault, physically segregated with individual serial numbers tracked for accuracy.",
                                 icon: "🛡️",
                             },
                         ].map((item) => (
@@ -163,7 +163,7 @@ export default function AboutPage() {
             {/* CTA */}
             <section className="bg-[#D4AF37] py-16 px-6 text-center">
                 <h3 className="font-serif text-3xl md:text-4xl text-black uppercase tracking-tight leading-none mb-6">
-                    Start Your Gold Journey
+                    Start Your Golden Journey
                 </h3>
                 <div className="flex gap-4 justify-center flex-wrap">
                     <Link
