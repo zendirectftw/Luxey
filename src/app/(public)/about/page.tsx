@@ -66,7 +66,7 @@ export default function AboutPage() {
                             {
                                 label: "Status Tier Progression",
                                 desc: "From Bronze to Titanium — earn lower fees and higher commissions as you grow.",
-                                icon: "🪜",
+                                icon: "📊",
                             },
                             {
                                 label: "Referral Commissions",
@@ -78,8 +78,8 @@ export default function AboutPage() {
                                 key={item.label}
                                 className="bg-white border border-[#E4E4E4] rounded-sm p-6 hover:border-[#D4AF37] transition-colors"
                             >
-                                <div className="flex items-start gap-4">
-                                    <div className="text-2xl">{item.icon}</div>
+                                <div className="flex items-center gap-4">
+                                    <div className="text-3xl">{item.icon}</div>
                                     <div>
                                         <h3 className="text-[11px] font-black uppercase tracking-widest text-black mb-1">
                                             {item.label}
