@@ -43,16 +43,16 @@ export default function AboutPage() {
                             Financial Freedom<br />Starts Here
                         </h2>
                         <p className="text-sm text-gray-500 font-medium leading-relaxed mb-4">
-                            We believe that owning physical precious metals is one of the most
+                            At <span style={{ letterSpacing: '0.2em' }} className="font-black">LUXEY</span>, we believe that owning physical precious metals is one of the most
                             reliable paths to building lasting wealth. Gold has been a store of
-                            value for over 5,000 years — and yet, buying it has always been
+                            value for over 5,000 years — and yet, buying it and storing it has always been
                             unnecessarily complex.
                         </p>
                         <p className="text-sm text-gray-500 font-medium leading-relaxed">
-                            Luxey changes that. Our platform combines real-time pricing,
-                            instant payouts, secure vault custody, and a referral network that
-                            lets you earn while you build. We&apos;re making precious metals
-                            accessible to everyone.
+                            <span style={{ letterSpacing: '0.2em' }} className="font-black">LUXEY</span> changes that. Our platform combines compelling real-time pricing
+                            and a secure storage option for buyers with fast payouts and referral
+                            commissions for sellers. We help you build wealth through precious
+                            metals ownership. Finally, gold and precious metals are accessible to everyone!
                         </p>
                     </div>
 
