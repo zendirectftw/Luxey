@@ -79,7 +79,7 @@ export default function HomePage() {
                                     <p className="text-[10px] font-black uppercase tracking-[0.3em] text-[#D4AF37] mb-4">
                                         Featured Product
                                     </p>
-                                    <h1 className="font-serif text-4xl md:text-6xl text-white uppercase tracking-tight leading-none mb-3">
+                                    <h1 className="font-serif text-4xl md:text-6xl text-white tracking-tight leading-none mb-3">
                                         {slide.title}
                                     </h1>
                                     <p className="text-sm text-zinc-400 font-medium uppercase tracking-wider mb-8">
@@ -288,8 +288,7 @@ export default function HomePage() {
                                 Fastest Labels
                             </h4>
                             <p className="text-xs text-zinc-500 font-medium leading-relaxed">
-                                Shipping labels generated instantly upon sale confirmation.
-                                No waiting.
+                                Shipping labels generated automatically within minutes of sell confirmation.
                             </p>
                         </div>
                         <div className="text-center p-8 border border-zinc-800 rounded-sm hover:border-[#D4AF37] transition-colors">
@@ -298,18 +297,16 @@ export default function HomePage() {
                                 Fastest Payouts
                             </h4>
                             <p className="text-xs text-zinc-500 font-medium leading-relaxed">
-                                Real-Time Payments (RTP) — funds hit your account the moment
-                                verification completes.
+                                Real-Time Payments (RTP) — funds hit your account quickly after verification.
                             </p>
                         </div>
                         <div className="text-center p-8 border border-zinc-800 rounded-sm hover:border-[#D4AF37] transition-colors">
                             <div className="text-4xl mb-4">🏆</div>
                             <h4 className="text-sm font-black uppercase tracking-widest text-white mb-2">
-                                Easiest Sourcing
+                                Complete Transparency
                             </h4>
                             <p className="text-xs text-zinc-500 font-medium leading-relaxed">
-                                Browse, bid, buy — the simplest precious metals marketplace
-                                ever built.
+                                Easily track purchase order status from Lock to Paid.
                             </p>
                         </div>
                     </div>

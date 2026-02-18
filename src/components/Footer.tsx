@@ -22,7 +22,7 @@ export default function Footer() {
                         </div>
                     </Link>
                     <p className="text-zinc-500 text-xs font-light max-w-xs leading-snug font-sans">
-                        We help you to build wealth and financial freedom through gold,
+                        We help you to build wealth and gain financial freedom by investing in physical gold,
                         silver and rare coins.
                     </p>
                 </div>
