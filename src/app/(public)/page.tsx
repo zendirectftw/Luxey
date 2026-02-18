@@ -11,24 +11,21 @@ const heroSlides = [
     {
         title: "1 oz PAMP Lady Fortuna",
         subtitle: "The World's Most Trusted Gold Bar",
-        image:
-            "https://aouokhwqjizbcoutydig.supabase.co/storage/v1/object/public/product-image/Pamp%20Footprint.jpg",
+        image: "/hero-pamp-fortuna.png",
         cta: "View Product",
         href: "/product/pamp-fortuna-1oz",
     },
     {
         title: "American Gold Eagle",
         subtitle: "America's Premier Gold Bullion Coin",
-        image:
-            "https://aouokhwqjizbcoutydig.supabase.co/storage/v1/object/public/product-image/Gold-American-Eagle.png",
+        image: "/hero-gold-eagle.png",
         cta: "View Product",
         href: "/product/gold-eagle-1oz",
     },
     {
         title: "Canadian Gold Maple Leaf",
         subtitle: ".9999 Fine Gold — Purest in the World",
-        image:
-            "https://aouokhwqjizbcoutydig.supabase.co/storage/v1/object/public/product-image/Gold-Canadian-Maple-leaf.png",
+        image: "/hero-maple-leaf.png",
         cta: "View Product",
         href: "/product/canadian-maple-1oz",
     },
