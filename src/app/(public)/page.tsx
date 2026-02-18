@@ -123,7 +123,7 @@ export default function HomePage() {
             <div className="bg-[#D4AF37] py-3 px-6">
                 <div className="max-w-7xl mx-auto flex justify-between items-center">
                     <p className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] text-black">
-                        The Best Way to Source Physical Gold and Precious Metals
+                        The Ideal Way to Invest in Physical Gold and Precious Metals
                     </p>
                 </div>
             </div>
