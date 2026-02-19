@@ -24,6 +24,12 @@ interface ProductImage {
     isDefault: boolean;
 }
 
+const formatDisplayName = (name: string) => {
+    // Matches: timestamp (13 chars) - name
+    const match = name.match(/^\d{13}-(.+)$/);
+    return match ? match[1] : name;
+};
+
 export default function CreateProductPage() {
     const router = useRouter();
     const [saving, setSaving] = useState(false);
@@ -41,11 +47,39 @@ export default function CreateProductPage() {
     const [year, setYear] = useState("");
     const [isActive, setIsActive] = useState(false);
 
+    // Dynamic attributes state
+    const [dynamicAttributes, setDynamicAttributes] = useState<Record<string, string[]>>({});
+
+    useEffect(() => {
+        const fetchAttributes = async () => {
+            const { data } = await supabase
+                .from("attributes")
+                .select("slug, attribute_values(value, display_order)");
+            
+            if (data) {
+                const map: Record<string, string[]> = {};
+                data.forEach((attr: any) => {
+                    if (attr.attribute_values) {
+                        map[attr.slug] = attr.attribute_values
+                            .sort((a: any, b: any) => a.display_order - b.display_order)
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            .map((v: any) => v.value);
+                    }
+                });
+                setDynamicAttributes(map);
+            }
+        };
+        fetchAttributes();
+    }, []);
+
     // Image management – storage bucket browser
     const [bucketFiles, setBucketFiles] = useState<StorageFile[]>([]);
     const [loadingFiles, setLoadingFiles] = useState(true);
     const [selectedImages, setSelectedImages] = useState<ProductImage[]>([]);
     const [dragIdx, setDragIdx] = useState<number | null>(null);
+    const [urlInput, setUrlInput] = useState("");
+    const [isDragging, setIsDragging] = useState(false);
+    const [uploading, setUploading] = useState(false);
 
     const generateSlug = (name: string) =>
         name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
@@ -56,33 +90,14 @@ export default function CreateProductPage() {
     useEffect(() => {
         async function loadBucketFiles() {
             setLoadingFiles(true);
-            const { data, error: listError } = await supabase.storage
-                .from("product-images")
-                .list("products", { limit: 200, sortBy: { column: "name", order: "asc" } });
-
-            if (listError || !data) {
-                // Try root if "products" folder doesn't exist
-                const { data: rootData } = await supabase.storage
-                    .from("product-images")
-                    .list("", { limit: 200, sortBy: { column: "name", order: "asc" } });
-
-                if (rootData) {
-                    const files: StorageFile[] = rootData
-                        .filter(f => f.name && !f.name.startsWith("."))
-                        .map(f => ({
-                            name: f.name,
-                            url: supabase.storage.from("product-images").getPublicUrl(f.name).data.publicUrl,
-                        }));
-                    setBucketFiles(files);
+            try {
+                const res = await fetch("/api/admin/storage-list");
+                const json = await res.json();
+                if (json.files) {
+                    setBucketFiles(json.files);
                 }
-            } else {
-                const files: StorageFile[] = data
-                    .filter(f => f.name && !f.name.startsWith("."))
-                    .map(f => ({
-                        name: f.name,
-                        url: supabase.storage.from("product-images").getPublicUrl(`products/${f.name}`).data.publicUrl,
-                    }));
-                setBucketFiles(files);
+            } catch {
+                // silently fail — bucket picker just shows empty
             }
             setLoadingFiles(false);
         }
@@ -128,6 +143,86 @@ export default function CreateProductPage() {
         setDragIdx(index);
     };
     const handleDragEnd = () => setDragIdx(null);
+
+    // ─── File Upload (Drag & Drop) ─────────────────────
+    const handleFileUpload = async (files: FileList | null) => {
+        if (!files || files.length === 0) return;
+        setUploading(true);
+
+        const newImages: ProductImage[] = [];
+        const newBucketFiles: StorageFile[] = [];
+
+        try {
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                if (!file.type.startsWith("image/")) continue;
+
+                const formData = new FormData();
+                formData.append("file", file);
+
+                const response = await fetch("/api/admin/upload", {
+                    method: "POST",
+                    body: formData,
+                });
+
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error || "Upload failed");
+
+                newImages.push({
+                    url: data.url,
+                    fileName: data.name,
+                    isDefault: false,
+                });
+
+                newBucketFiles.push({ name: data.name, url: data.url });
+            }
+
+            setSelectedImages(prev => {
+                const combined = [...prev, ...newImages];
+                // If no default was set, set the first new image as default (if it's the only one)
+                if (prev.length === 0 && newImages.length > 0) {
+                    combined[0].isDefault = true;
+                }
+                return combined;
+            });
+
+            // Optimistically update bucket files
+            setBucketFiles(prev => [...newBucketFiles, ...prev]);
+        } catch (err: any) {
+            setError(err.message || "Failed to upload image");
+        } finally {
+            setUploading(false);
+            setSaved(false);
+        }
+    };
+
+    const onDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(true);
+    };
+
+    const onDragLeave = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(false);
+    };
+
+    const onDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(false);
+        handleFileUpload(e.dataTransfer.files);
+    };
+
+    // ─── Add image by URL ──────────────────────────────
+    const addImageFromUrl = () => {
+        const url = urlInput.trim();
+        if (!url) return;
+        const fileName = url.split("/").pop()?.split("?")[0] || url;
+        const alreadyAdded = selectedImages.some(img => img.url === url);
+        if (!alreadyAdded) {
+            setSelectedImages(prev => [...prev, { url, fileName, isDefault: prev.length === 0 }]);
+        }
+        setUrlInput("");
+    };
 
     // ─── Auto-create dealer mappings + live_quotes ──────
     const createDealerMappings = useCallback(async (productId: string) => {
@@ -318,7 +413,7 @@ export default function CreateProductPage() {
                                     <div>
                                         <label className="form-label">Metal Type</label>
                                         <select className="form-input" value={metal} onChange={(e) => setMetal(e.target.value)}>
-                                            {metalGroup.items.map(item => (
+                                            {(dynamicAttributes["metal"] || metalGroup.items).map(item => (
                                                 <option key={item} value={item}>{item}</option>
                                             ))}
                                         </select>
@@ -326,7 +421,7 @@ export default function CreateProductPage() {
                                     <div>
                                         <label className="form-label">Weight</label>
                                         <select className="form-input" value={weightLabel} onChange={(e) => setWeightLabel(e.target.value)}>
-                                            {weightGroup.items.map(item => (
+                                            {(dynamicAttributes["weight-classes"] || weightGroup.items).map(item => (
                                                 <option key={item} value={item}>{item}</option>
                                             ))}
                                         </select>
@@ -334,7 +429,7 @@ export default function CreateProductPage() {
                                     <div>
                                         <label className="form-label">Purity</label>
                                         <select className="form-input" value={purityLabel} onChange={(e) => setPurityLabel(e.target.value)}>
-                                            {purityGroup.items.map(item => (
+                                            {(dynamicAttributes["purity"] || purityGroup.items).map(item => (
                                                 <option key={item} value={item}>{item}</option>
                                             ))}
                                         </select>
@@ -343,7 +438,7 @@ export default function CreateProductPage() {
                                         <label className="form-label">Mint</label>
                                         <select className="form-input" value={mint} onChange={(e) => setMint(e.target.value)}>
                                             <option value="">— Select —</option>
-                                            {mintGroup.items.map(item => (
+                                            {(dynamicAttributes["mint"] || mintGroup.items).map(item => (
                                                 <option key={item} value={item}>{item}</option>
                                             ))}
                                         </select>
@@ -351,7 +446,7 @@ export default function CreateProductPage() {
                                     <div>
                                         <label className="form-label">Category</label>
                                         <select className="form-input" value={category} onChange={(e) => setCategory(e.target.value)}>
-                                            {categoryGroup.items.map(item => (
+                                            {(dynamicAttributes["product-types"] || categoryGroup.items).map(item => (
                                                 <option key={item} value={item}>{item}</option>
                                             ))}
                                         </select>
@@ -395,6 +490,42 @@ export default function CreateProductPage() {
                             <div className="bg-white p-8 border border-[#E4E4E4] shadow-sm rounded-sm">
                                 <h3 className="text-[11px] font-black uppercase tracking-widest mb-6">Product Gallery</h3>
 
+                                {/* Dropzone */}
+                                <div
+                                    onDragOver={onDragOver}
+                                    onDragLeave={onDragLeave}
+                                    onDrop={onDrop}
+                                    onClick={() => document.getElementById("file-upload")?.click()}
+                                    className={`relative border-2 border-dashed rounded-sm p-8 text-center cursor-pointer transition-all mb-6 ${
+                                        isDragging ? "border-black bg-gray-50" : "border-[#E4E4E4] hover:border-gray-400"
+                                    }`}
+                                >
+                                    <input
+                                        type="file"
+                                        id="file-upload"
+                                        multiple
+                                        accept="image/*"
+                                        className="hidden"
+                                        onChange={(e) => handleFileUpload(e.target.files)}
+                                    />
+                                    {uploading ? (
+                                        <div className="flex flex-col items-center">
+                                            <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin mb-2" />
+                                            <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Uploading...</p>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <p className="text-2xl mb-2">☁️</p>
+                                            <p className="text-[10px] font-black uppercase tracking-widest text-black mb-1">
+                                                Drag & Drop or Click to Upload
+                                            </p>
+                                            <p className="text-[9px] font-bold text-gray-400 uppercase">
+                                                Supports JPG, PNG, WEBP
+                                            </p>
+                                        </>
+                                    )}
+                                </div>
+
                                 {/* Selected images (reorderable) */}
                                 {selectedImages.length > 0 && (
                                     <div className="space-y-2 mb-6">
@@ -425,7 +556,7 @@ export default function CreateProductPage() {
                                                         />
                                                     </div>
                                                     <span className="text-[10px] font-bold text-gray-600 flex-1 truncate">
-                                                        {img.fileName}
+                                                        {formatDisplayName(img.fileName)}
                                                     </span>
                                                     <button
                                                         onClick={() => setDefault(i)}
@@ -494,13 +625,36 @@ export default function CreateProductPage() {
                                                             </div>
                                                         )}
                                                         <p className="absolute bottom-0 left-0 right-0 bg-white/90 text-[7px] font-bold text-gray-500 text-center py-0.5 truncate px-1">
-                                                            {file.name}
+                                                            {formatDisplayName(file.name)}
                                                         </p>
                                                     </button>
                                                 );
                                             })}
                                         </div>
                                     )}
+                                </div>
+
+                                {/* URL input */}
+                                <div className="mt-4 pt-4 border-t border-[#E4E4E4]">
+                                    <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-2">
+                                        Or paste image URL
+                                    </p>
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="text"
+                                            placeholder="https://...supabase.co/storage/..."
+                                            value={urlInput}
+                                            onChange={e => setUrlInput(e.target.value)}
+                                            onKeyDown={e => e.key === "Enter" && addImageFromUrl()}
+                                            className="flex-1 text-[10px] border border-[#E4E4E4] px-3 py-2 font-mono focus:outline-none focus:border-black"
+                                        />
+                                        <button
+                                            onClick={addImageFromUrl}
+                                            className="px-3 py-2 text-[9px] font-black uppercase tracking-widest bg-black text-white hover:bg-gray-800 transition-colors"
+                                        >
+                                            Add
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>

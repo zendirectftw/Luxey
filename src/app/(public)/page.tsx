@@ -3,8 +3,8 @@
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import ProductCard from "@/components/ProductCard";
-import { sampleProducts, categories, weightFilters } from "@/data/products";
+import { ozToWeightLabel } from "@/lib/productAttributes";
+import ProductCard, { Product } from "@/components/ProductCard";
 import { useFavorites } from "@/context/FavoritesContext";
 
 const heroSlides = [
@@ -31,6 +31,18 @@ const heroSlides = [
     },
 ];
 
+const categories = [
+    "All",
+    "Gold Bars",
+    "Gold Coins",
+    "Silver",
+];
+
+const weightFilters = [
+    "1 oz",
+    "100gm",
+];
+
 export default function HomePage() {
     const [slideIndex, setSlideIndex] = useState(0);
     const [activeCategory, setActiveCategory] = useState("All");
@@ -38,6 +50,10 @@ export default function HomePage() {
     const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const { isFavorited, count: favCount } = useFavorites();
+    
+    // Real products state
+    const [products, setProducts] = useState<Product[]>([]);
+    const [loading, setLoading] = useState(true);
 
     // Auto-advance slider
     useEffect(() => {
@@ -47,8 +63,48 @@ export default function HomePage() {
         return () => clearInterval(interval);
     }, []);
 
+    // Fetch real products
+    useEffect(() => {
+        async function fetchProducts() {
+            try {
+                const res = await fetch("/api/product-prices");
+                const data = await res.json();
+                
+                if (data.products) {
+                    const mapped = data.products.map((p: any) => {
+                        // Map DB categories to UI filter categories
+                        let category = "Other";
+                        if (p.metal === "silver") category = "Silver";
+                        else if (p.metal === "gold" && p.category === "bar") category = "Gold Bars";
+                        else if (p.metal === "gold" && p.category === "coin") category = "Gold Coins";
+                        else if (p.metal === "platinum") category = "Platinum";
+                        else if (p.metal === "palladium") category = "Palladium";
+
+                        return {
+                            id: p.productId,
+                            name: p.productName,
+                            weight: `${p.weightOz} oz`, // detailed weight
+                            weightLabel: ozToWeightLabel(p.weightOz), // filterable label
+                            mint: p.mint || "Unknown Mint",
+                            image: p.imageUrl || "/placeholder.png",
+                            bid: new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(p.bestBid),
+                            ask: new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(p.bestAsk),
+                            category: category,
+                        };
+                    });
+                    setProducts(mapped);
+                }
+            } catch (error) {
+                console.error("Failed to fetch products:", error);
+            } finally {
+                setLoading(false);
+            }
+        }
+        fetchProducts();
+    }, []);
+
     // Filter products
-    const filteredProducts = sampleProducts.filter((p) => {
+    const filteredProducts = products.filter((p) => {
         const matchesCategory =
             activeCategory === "All" || p.category === activeCategory;
         const matchesWeight =
@@ -57,7 +113,9 @@ export default function HomePage() {
             !showFavoritesOnly || isFavorited(p.id);
         const matchesSearch = p.name
             .toLowerCase()
-            .includes(searchQuery.toLowerCase());
+            .includes(searchQuery.toLowerCase()) || 
+            p.mint.toLowerCase().includes(searchQuery.toLowerCase());
+            
         return matchesCategory && matchesWeight && matchesFavorites && matchesSearch;
     });
 

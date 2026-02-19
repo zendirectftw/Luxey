@@ -12,6 +12,7 @@ const navSections = [
             { href: "/admin/products", icon: "📦", text: "Products" },
             { href: "/admin/categories", icon: "📂", text: "Categories" },
             { href: "/admin/attributes", icon: "🏷️", text: "Attributes" },
+            { href: "/admin/dealers", icon: "🏢", text: "Dealers" },
         ],
     },
     {

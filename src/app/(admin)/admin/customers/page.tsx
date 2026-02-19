@@ -42,18 +42,32 @@ export default function CustomersPage() {
     const [search, setSearch] = useState("");
     const [tierFilter, setTierFilter] = useState("all");
 
-    useEffect(() => {
-        async function load() {
-            const { data, error } = await supabase
-                .from("users")
-                .select("id, full_name, email, tier, kyc_status, referral_code, created_at")
-                .neq("referral_code", "LUXEY-HOUSE") // exclude house account
-                .order("created_at", { ascending: false });
+    const loadUsers = async () => {
+        const { data, error } = await supabase
+            .from("users")
+            .select("id, full_name, email, tier, kyc_status, referral_code, created_at")
+            .neq("referral_code", "LUXEY-HOUSE")
+            .order("created_at", { ascending: false });
 
-            if (!error && data) setUsers(data);
-            setLoading(false);
-        }
-        load();
+        if (!error && data) setUsers(data);
+        setLoading(false);
+    };
+
+    useEffect(() => {
+        loadUsers();
+
+        // Real-time subscription — re-fetch on any users table change
+        const channel = supabase
+            .channel("admin-customers-realtime")
+            .on("postgres_changes", { event: "*", schema: "public", table: "users" }, () => {
+                loadUsers();
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const filtered = users.filter(u => {

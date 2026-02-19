@@ -8,9 +8,8 @@ import { supabase } from "@/lib/supabase";
 interface OrderData {
     id: string;
     po_number: string;
-    total_value: number;
+    seller_lock_price: number;
     status: string;
-    payment_method: string;
     label_preference: string;
     created_at: string;
     users: { id: string; full_name: string; email: string } | null;
@@ -45,30 +44,55 @@ export default function OrderDetailPage() {
 
     useEffect(() => {
         async function load() {
-            const { data: orderData } = await supabase
+            // Fetch PO with separate queries to avoid join syntax issues
+            const { data: poData } = await supabase
                 .from("purchase_orders")
-                .select("id, po_number, total_value, status, payment_method, label_preference, created_at, users!purchase_orders_seller_id_fkey(id, full_name, email), dealers(display_name)")
+                .select("id, po_number, seller_lock_price, status, label_preference, created_at, seller_id, dealer_id")
                 .eq("id", id)
-                .single();
+                .maybeSingle();
 
-            if (orderData) {
-                setOrder({
-                    ...orderData,
-                    users: Array.isArray(orderData.users) ? orderData.users[0] : orderData.users,
-                    dealers: Array.isArray(orderData.dealers) ? orderData.dealers[0] : orderData.dealers,
-                });
-
-                // Fetch shipment if exists
-                const { data: shipData } = await supabase
-                    .from("shipments")
-                    .select("*")
-                    .eq("purchase_order_id", orderData.id)
-                    .limit(1)
-                    .single();
-
-                if (shipData) setShipment(shipData);
+            if (!poData) {
+                setLoading(false);
+                return;
             }
 
+            // Fetch user separately
+            let userData = null;
+            if (poData.seller_id) {
+                const { data: u } = await supabase
+                    .from("users")
+                    .select("id, full_name, email")
+                    .eq("id", poData.seller_id)
+                    .maybeSingle();
+                userData = u;
+            }
+
+            // Fetch dealer separately
+            let dealerData = null;
+            if (poData.dealer_id) {
+                const { data: d } = await supabase
+                    .from("dealers")
+                    .select("display_name")
+                    .eq("id", poData.dealer_id)
+                    .maybeSingle();
+                dealerData = d;
+            }
+
+            setOrder({
+                ...poData,
+                users: userData,
+                dealers: dealerData,
+            });
+
+            // Fetch shipment if exists (maybeSingle won't throw if not found)
+            const { data: shipData } = await supabase
+                .from("shipments")
+                .select("*")
+                .eq("purchase_order_id", poData.id)
+                .limit(1)
+                .maybeSingle();
+
+            if (shipData) setShipment(shipData);
             setLoading(false);
         }
         load();
@@ -148,13 +172,12 @@ export default function OrderDetailPage() {
                             </span>
                         </div>
                         <p className="text-3xl font-black tracking-tighter mb-1">{order.po_number}</p>
-                        <p className="text-sm text-gray-400 mb-4">
-                            {new Date(order.created_at).toLocaleDateString()} · {order.payment_method || "—"}
-                        </p>
+                            {new Date(order.created_at).toLocaleDateString()} · Label: {order.label_preference || "—"}
+
                         <div className="grid grid-cols-2 gap-3">
                             <div className="bg-zinc-900/50 border border-zinc-800 rounded-sm p-3">
                                 <p className="text-[8px] font-black uppercase text-gray-500 mb-0.5">Total Value</p>
-                                <p className="text-lg font-black price-green">${Number(order.total_value).toLocaleString()}</p>
+                                <p className="text-lg font-black price-green">${Number(order.seller_lock_price).toLocaleString()}</p>
                             </div>
                             <div className="bg-zinc-900/50 border border-zinc-800 rounded-sm p-3">
                                 <p className="text-[8px] font-black uppercase text-gray-500 mb-0.5">Label</p>

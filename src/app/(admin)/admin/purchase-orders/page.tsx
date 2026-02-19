@@ -7,7 +7,7 @@ import { supabase } from "@/lib/supabase";
 interface PurchaseOrder {
     id: string;
     po_number: string;
-    total_value: number;
+    seller_lock_price: number;
     status: string;
     label_preference: string;
     created_at: string;
@@ -34,13 +34,14 @@ export default function AdminPurchaseOrdersPage() {
 
     useEffect(() => {
         async function load() {
+            // @ts-ignore
             const { data, error } = await supabase
                 .from("purchase_orders")
-                .select("id, po_number, total_value, status, label_preference, created_at, users!purchase_orders_seller_id_fkey(full_name, email), dealers(display_name)")
+                .select("id, po_number, seller_lock_price, status, label_preference, created_at, users:users!purchase_orders_seller_id_fkey!left(full_name, email), dealers(display_name)")
                 .order("created_at", { ascending: false });
 
             if (!error && data) {
-                setOrders(data.map(po => ({
+                setOrders((data as any).map((po: any) => ({
                     ...po,
                     users: Array.isArray(po.users) ? po.users[0] : po.users,
                     dealers: Array.isArray(po.dealers) ? po.dealers[0] : po.dealers,
@@ -61,7 +62,7 @@ export default function AdminPurchaseOrdersPage() {
     });
 
     // Live stats
-    const totalValue = orders.reduce((sum, o) => sum + Number(o.total_value || 0), 0);
+    const totalValue = orders.reduce((sum, o) => sum + Number(o.seller_lock_price || 0), 0);
     const statusCounts = orders.reduce((acc, o) => { acc[o.status] = (acc[o.status] || 0) + 1; return acc; }, {} as Record<string, number>);
 
     if (loading) {
@@ -166,7 +167,7 @@ export default function AdminPurchaseOrdersPage() {
                                             <p className="text-[10px] text-gray-400">{o.users?.email || ""}</p>
                                         </td>
                                         <td className="p-4 text-xs font-medium text-gray-600">{o.dealers?.display_name || "—"}</td>
-                                        <td className="p-4 text-right text-sm font-black price-green">${Number(o.total_value).toLocaleString()}</td>
+                                        <td className="p-4 text-right text-sm font-black price-green">${Number(o.seller_lock_price).toLocaleString()}</td>
                                         <td className="p-4 text-center">
                                             <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded ${o.label_preference === "immediate" ? "bg-blue-50 text-blue-700" : "bg-gray-100 text-gray-600"
                                                 }`}>

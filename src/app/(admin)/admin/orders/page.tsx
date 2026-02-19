@@ -7,9 +7,9 @@ import { supabase } from "@/lib/supabase";
 interface Order {
     id: string;
     po_number: string;
-    total_value: number;
+    seller_lock_price: number;
     status: string;
-    payment_method: string;
+    label_preference: string;
     created_at: string;
     users: { full_name: string; email: string } | null;
 }
@@ -22,13 +22,14 @@ export default function OrdersPage() {
 
     useEffect(() => {
         async function load() {
+            // @ts-ignore
             const { data, error } = await supabase
                 .from("purchase_orders")
-                .select("id, po_number, total_value, status, payment_method, created_at, users!purchase_orders_seller_id_fkey(full_name, email)")
+                .select("id, po_number, seller_lock_price, status, label_preference, created_at, users:users!purchase_orders_seller_id_fkey!left(full_name, email)")
                 .order("created_at", { ascending: false });
 
-            if (!error && data) {
-                setOrders(data.map(o => ({
+            if (data) {
+                setOrders((data as any).map((o: any) => ({
                     ...o,
                     users: Array.isArray(o.users) ? o.users[0] : o.users,
                 })));
@@ -47,7 +48,7 @@ export default function OrdersPage() {
         return true;
     });
 
-    const totalValue = orders.reduce((sum, o) => sum + Number(o.total_value || 0), 0);
+    const totalValue = orders.reduce((sum, o) => sum + Number(o.seller_lock_price || 0), 0);
     const statusCounts = orders.reduce((acc, o) => { acc[o.status] = (acc[o.status] || 0) + 1; return acc; }, {} as Record<string, number>);
 
     if (loading) {
@@ -150,11 +151,11 @@ export default function OrdersPage() {
                                             <p className="text-xs font-bold uppercase">{o.users?.full_name || "—"}</p>
                                             <p className="text-[10px] text-gray-400">{o.users?.email || ""}</p>
                                         </td>
-                                        <td className="p-4 text-right text-sm font-black price-green">${Number(o.total_value).toLocaleString()}</td>
+                                        <td className="p-4 text-right text-sm font-black price-green">${Number(o.seller_lock_price).toLocaleString()}</td>
                                         <td className="p-4 text-center">
-                                            <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded ${o.payment_method === "rtp" ? "bg-blue-50 text-blue-700" : "bg-gray-100 text-gray-600"
+                                            <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded ${o.label_preference === "immediate" ? "bg-blue-50 text-blue-700" : "bg-gray-100 text-gray-600"
                                                 }`}>
-                                                {o.payment_method || "—"}
+                                                {o.label_preference || "—"}
                                             </span>
                                         </td>
                                         <td className="p-4 text-xs font-medium text-gray-500">

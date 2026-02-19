@@ -6,9 +6,13 @@ import { supabase } from "@/lib/supabase";
 
 interface DashboardStats {
     totalCustomers: number;
-    totalProducts: number;
+    newCustomersThisMonth: number;
     totalPOs: number;
-    totalDealers: number;
+    newPOsThisWeek: number;
+    monthlyRevenue: number;
+    revenueGrowth: number;
+    totalProducts: number;
+    newProductsThisWeek: number;
 }
 
 interface RecentUser {
@@ -29,44 +33,117 @@ interface RecentPO {
 }
 
 export default function AdminDashboardPage() {
-    const [stats, setStats] = useState<DashboardStats>({ totalCustomers: 0, totalProducts: 0, totalPOs: 0, totalDealers: 0 });
+    const [stats, setStats] = useState<DashboardStats>({ 
+        totalCustomers: 0, 
+        newCustomersThisMonth: 0,
+        totalPOs: 0,
+        newPOsThisWeek: 0,
+        monthlyRevenue: 0,
+        revenueGrowth: 0,
+        totalProducts: 0, 
+        newProductsThisWeek: 0
+    });
     const [recentUsers, setRecentUsers] = useState<RecentUser[]>([]);
     const [recentPOs, setRecentPOs] = useState<RecentPO[]>([]);
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        async function load() {
-            const [customersRes, productsRes, posRes, dealersRes, recentUsersRes, recentPOsRes] = await Promise.all([
-                supabase.from("users").select("*", { count: "exact", head: true }).neq("referral_code", "LUXEY-HOUSE"),
-                supabase.from("products").select("*", { count: "exact", head: true }),
-                supabase.from("purchase_orders").select("*", { count: "exact", head: true }),
-                supabase.from("dealers").select("*", { count: "exact", head: true }),
-                supabase.from("users").select("id, full_name, email, tier, created_at")
-                    .neq("referral_code", "LUXEY-HOUSE")
-                    .order("created_at", { ascending: false })
-                    .limit(5),
-                supabase.from("purchase_orders").select("id, po_number, total_value, status, created_at, users!purchase_orders_seller_id_fkey(full_name)")
-                    .order("created_at", { ascending: false })
-                    .limit(5),
-            ]);
+    const fetchData = async () => {
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+        const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
+        const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay())).toISOString();
 
-            setStats({
-                totalCustomers: customersRes.count || 0,
-                totalProducts: productsRes.count || 0,
-                totalPOs: posRes.count || 0,
-                totalDealers: dealersRes.count || 0,
-            });
+        const [
+            // Customers
+            customersTotal,
+            customersThisMonth,
 
-            if (recentUsersRes.data) setRecentUsers(recentUsersRes.data);
-            if (recentPOsRes.data) {
-                setRecentPOs(recentPOsRes.data.map(po => ({
-                    ...po,
-                    users: Array.isArray(po.users) ? po.users[0] : po.users,
-                })));
-            }
-            setLoading(false);
+            // Active POs (Not paid/completed)
+            activePOsRes,
+            posThisWeek,
+
+            // Revenue (This Month vs Last Month)
+            revenueThisMonthRows,
+            revenueLastMonthRows,
+            
+            // Products
+            productsTotal,
+            productsThisWeek,
+
+            // Recent Data
+            recentUsersRes,
+            recentPOsRes
+        ] = await Promise.all([
+            // Customers
+            supabase.from("users").select("*", { count: "exact", head: true }).neq("referral_code", "LUXEY-HOUSE"),
+            supabase.from("users").select("*", { count: "exact", head: true }).neq("referral_code", "LUXEY-HOUSE").gte("created_at", startOfMonth),
+            
+            // POs - fetch all status for client-side filter + total count
+            supabase.from("purchase_orders").select("status"),
+            supabase.from("purchase_orders").select("*", { count: "exact", head: true }).gte("created_at", startOfWeek),
+
+            // Revenue
+            supabase.from("purchase_orders").select("seller_lock_price").gte("created_at", startOfMonth),
+            supabase.from("purchase_orders").select("seller_lock_price").gte("created_at", startOfLastMonth).lt("created_at", startOfMonth),
+
+            // Products (total count without is_active filter to match products page)
+            supabase.from("products").select("*", { count: "exact", head: true }),
+            supabase.from("products").select("*", { count: "exact", head: true }).gte("created_at", startOfWeek),
+
+            // Recent Data
+            supabase.from("users").select("id, full_name, email, tier, created_at")
+                .neq("referral_code", "LUXEY-HOUSE")
+                .order("created_at", { ascending: false })
+                .limit(5),
+            // @ts-ignore
+            supabase.from("purchase_orders").select("id, po_number, seller_lock_price, status, created_at, users:users!purchase_orders_seller_id_fkey!left(full_name)")
+                .order("created_at", { ascending: false })
+                .limit(5),
+        ]);
+
+        // Revenue Calculation
+        const revThisMonth = revenueThisMonthRows.data?.reduce((sum, row) => sum + (Number(row.seller_lock_price) || 0), 0) || 0;
+        const revLastMonth = revenueLastMonthRows.data?.reduce((sum, row) => sum + (Number(row.seller_lock_price) || 0), 0) || 0;
+        const revGrowth = revLastMonth > 0 ? ((revThisMonth - revLastMonth) / revLastMonth) * 100 : revThisMonth > 0 ? 100 : 0;
+
+        // POs total count
+        const allPOsData = activePOsRes.data;
+        const totalPOsCount = allPOsData ? allPOsData.length : 0;
+
+        setStats({
+            totalCustomers: customersTotal.count || 0,
+            newCustomersThisMonth: customersThisMonth.count || 0,
+            totalPOs: totalPOsCount,
+            newPOsThisWeek: posThisWeek.count || 0,
+            monthlyRevenue: revThisMonth,
+            revenueGrowth: revGrowth,
+            totalProducts: productsTotal.count || 0,
+            newProductsThisWeek: productsThisWeek.count || 0
+        });
+
+        if (recentUsersRes.data) setRecentUsers(recentUsersRes.data as RecentUser[]);
+        if (recentPOsRes.data) {
+            setRecentPOs((recentPOsRes.data as any[]).map(po => ({
+                ...po,
+                total_value: po.seller_lock_price,
+                users: Array.isArray(po.users) ? po.users[0] : po.users,
+            })));
         }
-        load();
+        setLoading(false);
+    };
+
+    useEffect(() => {
+        fetchData();
+
+        const channel = supabase.channel('dashboard_realtime')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, () => fetchData())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => fetchData())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'purchase_orders' }, () => fetchData())
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
     }, []);
 
     if (loading) {
@@ -100,17 +177,51 @@ export default function AdminDashboardPage() {
             <div className="flex-1 overflow-y-auto p-10 bg-[#FAFAFA]">
                 {/* KPI Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-                    {[
-                        { label: "Total Customers", value: stats.totalCustomers.toLocaleString() },
-                        { label: "Active Products", value: stats.totalProducts.toLocaleString() },
-                        { label: "Purchase Orders", value: stats.totalPOs.toLocaleString() },
-                        { label: "Active Dealers", value: stats.totalDealers.toLocaleString() },
-                    ].map((stat) => (
-                        <div key={stat.label} className="admin-stat">
-                            <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-3">{stat.label}</p>
-                            <p className="text-4xl font-black tracking-tighter mb-1">{stat.value}</p>
+                    {/* CUSTOMERS */}
+                    <div className="admin-stat">
+                        <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-3">Total Customers</p>
+                        <p className="text-4xl font-black tracking-tighter mb-1">{stats.totalCustomers.toLocaleString()}</p>
+                        <div className="flex items-center gap-2 mt-2">
+                             <span className="text-[10px] font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
+                                +{stats.newCustomersThisMonth} this month
+                             </span>
                         </div>
-                    ))}
+                    </div>
+
+                    {/* PURCHASE ORDERS */}
+                    <div className="admin-stat">
+                        <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-3">Purchase Orders</p>
+                        <p className="text-4xl font-black tracking-tighter mb-1">{stats.totalPOs.toLocaleString()}</p>
+                        <div className="flex items-center gap-2 mt-2">
+                             <span className="text-[10px] font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
+                                +{stats.newPOsThisWeek} this week
+                             </span>
+                        </div>
+                    </div>
+
+                    {/* REVENUE */}
+                    <div className="admin-stat">
+                        <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-3">Monthly Revenue</p>
+                        <p className="text-4xl font-black tracking-tighter mb-1">
+                            ${stats.monthlyRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                        </p>
+                        <div className="flex items-center gap-2 mt-2">
+                             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${stats.revenueGrowth >= 0 ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50'}`}>
+                                {stats.revenueGrowth >= 0 ? '+' : ''}{stats.revenueGrowth.toFixed(1)}% vs last month
+                             </span>
+                        </div>
+                    </div>
+
+                    {/* PRODUCTS */}
+                    <div className="admin-stat">
+                        <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-3">Products Listed</p>
+                        <p className="text-4xl font-black tracking-tighter mb-1">{stats.totalProducts.toLocaleString()}</p>
+                         <div className="flex items-center gap-2 mt-2">
+                            <span className="text-[10px] font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
+                                +{stats.newProductsThisWeek} new this week
+                             </span>
+                        </div>
+                    </div>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

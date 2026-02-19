@@ -1,0 +1,115 @@
+{
+  "dealers": [
+    {
+      "id": "0df8b5a8-a70c-4ce0-b366-3167ea361007",
+      "name": "Upstate Gold and Coin",
+      "display_name": "LUXEY - DENVER",
+      "display_city": "Denver, CO",
+      "code": "UGC",
+      "api_base_url": null,
+      "api_key_encrypted": null,
+      "auth_method": null,
+      "spot_offset": -5,
+      "shipping_address": {
+        "zip": "",
+        "city": "Denver",
+        "state": "CO",
+        "street": ""
+      },
+      "is_active": true,
+      "created_at": "2026-02-18T22:58:05.978904+00:00"
+    },
+    {
+      "id": "596c485a-7e1a-43b2-835f-a930ed37616f",
+      "name": "APMEX",
+      "display_name": "LUXEY - OKC",
+      "display_city": "Oklahoma City, OK",
+      "code": "APMEX",
+      "api_base_url": null,
+      "api_key_encrypted": null,
+      "auth_method": null,
+      "spot_offset": -5,
+      "shipping_address": {
+        "zip": "",
+        "city": "Oklahoma City",
+        "state": "OK",
+        "street": ""
+      },
+      "is_active": true,
+      "created_at": "2026-02-18T22:58:05.978904+00:00"
+    },
+    {
+      "id": "12aa188c-9f6b-45ad-add1-c1280ae96990",
+      "name": "A-MARK",
+      "display_name": "LUXEY - VEGAS",
+      "display_city": "Las Vegas, NV",
+      "code": "AMARK",
+      "api_base_url": null,
+      "api_key_encrypted": null,
+      "auth_method": null,
+      "spot_offset": -5,
+      "shipping_address": {
+        "zip": "",
+        "city": "Las Vegas",
+        "state": "NV",
+        "street": ""
+      },
+      "is_active": true,
+      "created_at": "2026-02-18T22:58:05.978904+00:00"
+    }
+  ],
+  "mapping": [
+    {
+      "id": "de573587-7308-43fa-bdbb-dc01d107ca61",
+      "dealer_id": "0df8b5a8-a70c-4ce0-b366-3167ea361007",
+      "product_id": "00000000-0000-0000-0001-000000000001",
+      "dealer_sku_id": null,
+      "dealer_product_url": null,
+      "fetch_method": "api",
+      "scrape_config": null,
+      "is_active": true
+    },
+    {
+      "id": "a595589c-3e9f-4ef8-a52b-925b3d69337b",
+      "dealer_id": "596c485a-7e1a-43b2-835f-a930ed37616f",
+      "product_id": "00000000-0000-0000-0001-000000000001",
+      "dealer_sku_id": null,
+      "dealer_product_url": null,
+      "fetch_method": "api",
+      "scrape_config": null,
+      "is_active": true
+    },
+    {
+      "id": "1b534749-60fd-4b3a-8ecb-b82e76162a90",
+      "dealer_id": "12aa188c-9f6b-45ad-add1-c1280ae96990",
+      "product_id": "00000000-0000-0000-0001-000000000001",
+      "dealer_sku_id": null,
+      "dealer_product_url": null,
+      "fetch_method": "api",
+      "scrape_config": null,
+      "is_active": true
+    },
+    {
+      "id": "ffbe0689-c1f6-4053-b49f-b41371127ae0",
+      "dealer_id": "0df8b5a8-a70c-4ce0-b366-3167ea361007",
+      "product_id": "00000000-0000-0000-0001-000000000002",
+      "dealer_sku_id": null,
+      "dealer_product_url": null,
+      "fetch_method": "api",
+      "scrape_config": null,
+      "is_active": true
+    },
+    {
+      "id": "f72599bc-ad1e-4e30-94f6-8c2da5a359d9",
+      "dealer_id": "596c485a-7e1a-43b2-835f-a930ed37616f",
+      "product_id": "00000000-0000-0000-0001-000000000002",
+      "dealer_sku_id": null,
+      "dealer_product_url": null,
+      "fetch_method": "api",
+      "scrape_config": null,
+      "is_active": true
+    }
+  ],
+  "e1": null,
+  "e2": null
+}

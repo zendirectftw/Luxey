@@ -51,24 +51,36 @@ export default function ReferralTreePage() {
     const [loading, setLoading] = useState(true);
     const [treeLoading, setTreeLoading] = useState(false);
 
-    useEffect(() => {
-        async function load() {
-            const { data } = await supabase
-                .from("users")
-                .select("id, full_name, email, tier, referral_code, created_at")
-                .neq("referral_code", "LUXEY-HOUSE")
-                .order("full_name");
+    const loadUsers = async () => {
+        const { data } = await supabase
+            .from("users")
+            .select("id, full_name, email, tier, referral_code, created_at")
+            .neq("referral_code", "LUXEY-HOUSE")
+            .order("full_name");
 
-            if (data) {
-                setUsers(data);
-                if (data.length > 0) {
-                    setSelectedUser(data[0]);
-                    loadUpline(data[0].id);
-                }
+        if (data) {
+            setUsers(data);
+            if (data.length > 0 && !selectedUser) {
+                setSelectedUser(data[0]);
+                loadUpline(data[0].id);
             }
-            setLoading(false);
         }
-        load();
+        setLoading(false);
+    };
+
+    useEffect(() => {
+        loadUsers();
+
+        // Real-time: refresh user list on any user table change
+        const channel = supabase
+            .channel("referral-tree-users-rt")
+            .on("postgres_changes", { event: "*", schema: "public", table: "users" }, () => {
+                loadUsers();
+            })
+            .subscribe();
+
+        return () => { supabase.removeChannel(channel); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     async function loadUpline(userId: string) {

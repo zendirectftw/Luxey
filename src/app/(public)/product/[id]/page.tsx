@@ -230,8 +230,8 @@ export default function ProductDetailPage() {
                         </p>
                     </div>
 
-                    {/* ═══ DEALER COMPARISON TABLE ═══ */}
-                    {product.dealerQuotes.length > 0 && (
+                    {/* ═══ DEALER COMPARISON TABLE — hidden ═══ */}
+                    {/* {product.dealerQuotes.length > 0 && (
                         <div className="border-t border-[#E4E4E4] pt-8 mb-8">
                             <h3 className="text-[11px] font-black uppercase tracking-widest text-gray-400 mb-4">
                                 Dealer Comparison
@@ -294,7 +294,7 @@ export default function ProductDetailPage() {
                                 Spot: Bid {formatUSD(product.spotBid)}/oz · Ask {formatUSD(product.spotAsk)}/oz
                             </p>
                         </div>
-                    )}
+                    )} */}
 
                     {/* Specs */}
                     <div className="border-t border-[#E4E4E4] pt-8">

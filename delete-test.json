@@ -1,0 +1,21 @@
+{
+  "products": [
+    {
+      "id": "13b56000-2292-429e-b898-b82690ecde07",
+      "name": "1 oz Silver American Eagle BU"
+    },
+    {
+      "id": "00000000-0000-0000-0001-000000000006",
+      "name": "1 oz Canadian Maple Leaf"
+    },
+    {
+      "id": "00000000-0000-0000-0001-000000000002",
+      "name": "1 oz Gold Eagle BU"
+    }
+  ],
+  "anonDeleteFakeIdError": "no error (allowed)",
+  "anonDeleteFakeIdStatus": 204,
+  "anonRealDeleteError": "no error (deleted!)",
+  "anonRealDeleteStatus": 204,
+  "stillExists": false
+}

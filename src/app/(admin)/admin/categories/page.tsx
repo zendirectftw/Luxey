@@ -1,116 +1,267 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
+import { supabase } from "@/lib/supabase";
 
-const initialCategories = [
-    {
-        name: "Gold",
-        subs: [
-            { name: "Gold Coins", products: 12 },
-            { name: "Gold Bars", products: 8 },
-            { name: "Gold Rounds", products: 3 },
-        ],
-    },
-    {
-        name: "Silver",
-        subs: [
-            { name: "Silver Coins", products: 15 },
-            { name: "Silver Bars", products: 6 },
-        ],
-    },
-    {
-        name: "Platinum",
-        subs: [
-            { name: "Platinum Coins", products: 4 },
-        ],
-    },
-];
+interface Category {
+    id: string;
+    name: string;
+    slug: string;
+    parent_id: string | null;
+    products: { count: number }[];
+}
+
+interface CategoryWithCount extends Category {
+    product_count: number;
+    children: CategoryWithCount[];
+}
 
 export default function CategoriesPage() {
-    const [categories] = useState(initialCategories);
+    const [categories, setCategories] = useState<CategoryWithCount[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    // Form State
     const [newName, setNewName] = useState("");
-    const [parentCat, setParentCat] = useState("None (Top Level)");
+    const [newParentId, setNewParentId] = useState("");
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const nameInputRef = useRef<HTMLInputElement>(null);
+
+    const fetchCategories = async () => {
+        setLoading(true);
+        // Fetch categories with product count
+        const { data, error } = await supabase
+            .from("categories")
+            .select("*, products(count)");
+
+        if (error) {
+            console.error("Error fetching categories:", error);
+            setError(error.message);
+        } else {
+            // Transform data to tree
+            const rawCats = (data || []).map((c: any) => ({
+                ...c,
+                product_count: c.products?.[0]?.count || 0,
+                children: []
+            }));
+
+            const tree: CategoryWithCount[] = [];
+            const map = new Map<string, CategoryWithCount>();
+
+            // First pass: create nodes
+            rawCats.forEach((c: CategoryWithCount) => {
+                map.set(c.id, c);
+            });
+
+            // Second pass: link children
+            rawCats.forEach((c: CategoryWithCount) => {
+                if (c.parent_id && map.has(c.parent_id)) {
+                    map.get(c.parent_id)!.children.push(c);
+                } else {
+                    tree.push(c);
+                }
+            });
+            
+            // Sort keys
+            const metalOrder = ["Gold", "Silver", "Platinum", "Palladium"];
+            tree.sort((a, b) => {
+                const idxA = metalOrder.indexOf(a.name);
+                const idxB = metalOrder.indexOf(b.name);
+                if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+                if (idxA !== -1) return -1;
+                if (idxB !== -1) return 1;
+                return a.name.localeCompare(b.name);
+            });
+
+            setCategories(tree);
+        }
+        setLoading(false);
+    };
+
+    useEffect(() => {
+        fetchCategories();
+    }, []);
+
+    const handleCreate = async () => {
+        if (!newName.trim()) return;
+        setIsSubmitting(true);
+
+        const slug = newName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+        const parentId = newParentId || null;
+
+        const { error } = await supabase.from("categories").insert({
+            name: newName,
+            slug,
+            parent_id: parentId
+        });
+
+        if (error) {
+            alert(error.message);
+        } else {
+            setNewName("");
+            setNewParentId("");
+            fetchCategories();
+        }
+        setIsSubmitting(false);
+    };
+
+    const handleDelete = async (id: string) => {
+        if (!confirm("Are you sure? This will delete the category.")) return;
+
+        const { error } = await supabase.from("categories").delete().eq("id", id);
+        if (error) {
+            alert(error.message);
+        } else {
+            fetchCategories();
+        }
+    };
 
     return (
         <>
-            <header className="h-20 bg-white border-b border-[#E4E4E4] flex items-center px-10 shrink-0">
-                <h2 className="text-xs font-black uppercase tracking-[0.2em]">Category Management</h2>
+            <header className="h-20 bg-white border-b border-[#E4E4E4] flex items-center px-10 shrink-0 sticky top-0 z-10">
+                <h1 className="text-xs font-black uppercase tracking-[0.2em]">category Management</h1>
             </header>
 
-            <div className="flex-1 overflow-y-auto p-10 bg-[#FAFAFA]">
-                <div className="grid grid-cols-3 gap-8">
-                    {/* Create Category */}
-                    <div className="bg-white p-6 border border-[#E4E4E4] shadow-sm h-fit rounded-sm">
-                        <h3 className="text-[11px] font-black uppercase tracking-widest mb-6">New Category</h3>
-                        <div className="space-y-4">
-                            <div>
-                                <label className="form-label">Category Name</label>
-                                <input
-                                    type="text"
-                                    className="form-input"
-                                    value={newName}
-                                    onChange={(e) => setNewName(e.target.value)}
-                                    placeholder="e.g. Palladium"
-                                />
-                            </div>
-                            <div>
-                                <label className="form-label">Parent Category</label>
-                                <select
-                                    className="form-input"
-                                    value={parentCat}
-                                    onChange={(e) => setParentCat(e.target.value)}
-                                >
-                                    <option>None (Top Level)</option>
-                                    {categories.map(c => (
-                                        <option key={c.name}>{c.name}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <button className="w-full bg-black text-white py-3 text-[10px] font-black uppercase tracking-widest mt-2 hover:bg-zinc-800 transition-all">
-                                Create Category
-                            </button>
-                        </div>
+            <div className="flex-1 bg-[#FAFAFA] p-10 overflow-y-auto">
+                {loading ? (
+                    <div className="flex justify-center p-10">
+                         <div className="w-6 h-6 border-2 border-black border-t-transparent rounded-full animate-spin" />
                     </div>
-
-                    {/* Category Tree */}
-                    <div className="col-span-2 bg-white border border-[#E4E4E4] shadow-sm overflow-hidden rounded-sm">
-                        <div className="p-4 bg-[#FAFAFA] border-b border-[#E4E4E4] flex justify-between items-center">
-                            <span className="text-[10px] font-black uppercase tracking-widest">Current Structures</span>
-                            <span className="text-[10px] text-gray-400">Click to assign products</span>
-                        </div>
-                        <div className="p-6 space-y-4">
-                            {categories.map((cat, idx) => (
-                                <div key={cat.name} className="border border-gray-100 rounded-sm">
-                                    <div className="p-3 bg-gray-50 flex justify-between items-center">
-                                        <span className="text-sm font-bold uppercase tracking-tight">
-                                            {idx + 1}. {cat.name}
-                                        </span>
-                                        <div className="flex gap-2">
-                                            <button className="text-[9px] font-black uppercase text-gray-400 hover:text-black transition-colors">
-                                                Add Sub
-                                            </button>
-                                            <button className="text-[9px] font-black uppercase text-red-400 hover:text-red-600 transition-colors">
-                                                Delete
-                                            </button>
-                                        </div>
+                ) : (
+                    <div className="grid grid-cols-12 gap-8 max-w-6xl mx-auto">
+                        
+                        {/* LEFT COLUMN: Add New Category */}
+                        <div className="col-span-4">
+                            <div className="bg-white border border-[#E4E4E4] shadow-sm rounded-sm p-6 sticky top-8">
+                                <h2 className="text-[11px] font-black uppercase tracking-widest mb-6 border-b border-gray-100 pb-4">
+                                    {newParentId ? `Add Sub-Category for ${categories.find(c => c.id === newParentId)?.name}` : "Add New Category"}
+                                </h2>
+                                
+                                <div className="space-y-5">
+                                    <div>
+                                        <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-2">
+                                            Name
+                                        </label>
+                                        <input 
+                                            ref={nameInputRef}
+                                            className="w-full bg-[#FAFAFA] border border-[#E4E4E4] px-4 py-3 text-xs font-medium focus:outline-none focus:border-black transition-colors placeholder-gray-300" 
+                                            value={newName}
+                                            onChange={e => setNewName(e.target.value)}
+                                            placeholder={newParentId ? "e.g. Coins" : "e.g. Gold"}
+                                        />
                                     </div>
-                                    {cat.subs.length > 0 && (
-                                        <div className="pl-8 p-3 space-y-2 border-t border-gray-100">
-                                            {cat.subs.map((sub) => (
-                                                <div key={sub.name} className="flex justify-between items-center text-xs py-1">
-                                                    <span className="text-gray-600">— {sub.name}</span>
-                                                    <span className="text-[10px] font-bold text-[#D4AF37]">
-                                                        {sub.products} Products
-                                                    </span>
-                                                </div>
+
+                                    <div>
+                                        <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-2">
+                                            Parent Category
+                                        </label>
+                                        <select 
+                                            className="w-full bg-[#FAFAFA] border border-[#E4E4E4] px-4 py-3 text-xs font-medium focus:outline-none focus:border-black transition-colors appearance-none cursor-pointer"
+                                            value={newParentId}
+                                            onChange={e => setNewParentId(e.target.value)}
+                                        >
+                                            <option value="">— None (Top Level) —</option>
+                                            {categories.map(c => (
+                                                <option key={c.id} value={c.id}>{c.name}</option>
                                             ))}
-                                        </div>
+                                        </select>
+                                        <p className="mt-2 text-[9px] text-gray-400 leading-relaxed">
+                                                                                    </p>
+                                    </div>
+
+                                    <button 
+                                        onClick={handleCreate}
+                                        disabled={!newName.trim() || isSubmitting}
+                                        className="w-full bg-black text-white py-3 text-[10px] font-black uppercase tracking-[0.2em] hover:bg-zinc-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-4"
+                                    >
+                                        {isSubmitting ? "Creating..." : newParentId ? "Add Sub-Category" : "Create Category"}
+                                    </button>
+                                    
+                                    {newParentId && (
+                                        <button 
+                                            onClick={() => setNewParentId("")}
+                                            className="w-full text-[9px] text-gray-400 hover:text-black mt-2 underline transition-colors"
+                                        >
+                                            Cancel Sub-Category Mode
+                                        </button>
                                     )}
                                 </div>
-                            ))}
+                            </div>
+                        </div>
+
+                        {/* RIGHT COLUMN: Current Structures */}
+                        <div className="col-span-8">
+                            <div className="bg-white border border-[#E4E4E4] shadow-sm rounded-sm p-8 min-h-[500px]">
+                                <div className="flex justify-between items-center mb-8 border-b border-gray-100 pb-4">
+                                    <h2 className="text-[11px] font-black uppercase tracking-widest">Current Structures</h2>
+                                    <span className="text-[9px] font-bold text-gray-300 uppercase tracking-widest hidden sm:inline">
+                                        Click to assign products
+                                    </span>
+                                </div>
+
+                                <div className="space-y-8">
+                                    {categories.map((parent, index) => (
+                                        <div key={parent.id} className="group pb-6 border-b border-dashed border-gray-100 last:border-0 last:pb-0">
+                                            {/* Parent Header */}
+                                            <div className="flex items-center justify-between mb-4">
+                                                <div className="flex items-center gap-3">
+                                                    <span className="text-sm font-black text-black">{index + 1}.</span>
+                                                    <span className="text-sm font-black uppercase text-black">{parent.name}</span>
+                                                </div>
+                                                <div className="flex items-center gap-4">
+                                                    <button 
+                                                        onClick={() => {
+                                                            setNewParentId(parent.id);
+                                                            setNewName("");
+                                                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                                                            setTimeout(() => nameInputRef.current?.focus(), 100);
+                                                        }}
+                                                        className="text-[9px] font-black uppercase tracking-widest text-blue-400 hover:text-blue-600 transition-colors"
+                                                    >
+                                                        Add Sub
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => handleDelete(parent.id)}
+                                                        className="text-[9px] font-black uppercase tracking-widest text-red-300 hover:text-red-600 transition-colors"
+                                                    >
+                                                        Delete
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {/* Children */}
+                                            <div className="pl-8 space-y-2 border-l-2 border-gray-50 ml-2">
+                                                {parent.children.length === 0 ? (
+                                                    <p className="text-[10px] text-gray-300 italic py-2 pl-2">No sub-categories yet.</p>
+                                                ) : (
+                                                    parent.children.map(child => (
+                                                        <div key={child.id} className="flex items-center justify-between group/child py-2 pl-2 hover:bg-gray-50 rounded-sm transition-colors -ml-2 pr-2">
+                                                            <div className="flex items-center gap-3">
+                                                                <span className="text-gray-300 text-xs">—</span>
+                                                                <span className="text-xs text-gray-600 font-bold">{child.name}</span>
+                                                            </div>
+                                                            <div className="flex items-center gap-4">
+                                                                <span className="text-[9px] font-black text-yellow-500 uppercase tracking-wider">
+                                                                    {child.product_count} Products
+                                                                </span>
+                                                                <button 
+                                                                    onClick={() => handleDelete(child.id)}
+                                                                    className="text-[9px] font-bold text-gray-300 hover:text-red-500 transition-all uppercase tracking-widest"
+                                                                >
+                                                                    Delete
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    ))
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </div>
+                )}
             </div>
         </>
     );

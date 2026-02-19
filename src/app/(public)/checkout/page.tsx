@@ -4,9 +4,10 @@ import React, { useState, useEffect, Suspense } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
-import { sampleProducts } from "@/data/products";
+
+
 import LuxeyCTA from "@/components/LuxeyCTA";
-import { useCart, CartItem } from "@/context/CartContext";
+import { useCart } from "@/context/CartContext";
 
 export default function CheckoutPage() {
     return (
@@ -29,35 +30,74 @@ function CheckoutContent() {
     const router = useRouter();
     const cart = useCart();
 
-    // Determine mode: "cart" (multi-item) or "single" (sell flow)
+    // Determine mode: "cart" (multi-item) or "single" (sell/buy from product page)
     const fromCart = searchParams.get("from") === "cart";
     const productId = searchParams.get("product") || "";
     const action = searchParams.get("action") || "buy";
 
+    // Fetched product for single-item flows (sell or direct buy)
+    type CheckoutProduct = {
+        id: string; name: string; weight: string; weightLabel: string;
+        mint: string; image: string; bid: string; ask: string; category: string;
+    };
+    const [fetchedProduct, setFetchedProduct] = useState<CheckoutProduct | null>(null);
+    const [fetchingProduct, setFetchingProduct] = useState(!!productId && !fromCart);
+
+    useEffect(() => {
+        if (!productId || fromCart) return;
+        setFetchingProduct(true);
+        fetch(`/api/product-prices?productId=${productId}`)
+            .then(r => r.json())
+            .then(data => {
+                const p = data.products?.[0];
+                if (p) {
+                    const oz = p.weightOz;
+                    const wt = oz === 1 ? "1 Troy Oz" : oz === 10 ? "10 Troy Oz" : `${oz} Troy Oz`;
+                    setFetchedProduct({
+                        id: p.productId,
+                        name: p.productName,
+                        weight: wt,
+                        weightLabel: wt,
+                        mint: p.mint || "",
+                        image: p.imageUrl || "",
+                        bid: `$${Number(p.bestBid).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+                        ask: `$${Number(p.bestAsk).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+                        category: p.category || "",
+                    });
+                }
+            })
+            .catch(() => {})
+            .finally(() => setFetchingProduct(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [productId]);
+
     // Build the items list for this checkout
-    let checkoutItems: { product: typeof sampleProducts[0]; quantity: number; action: string }[] = [];
+    let checkoutItems: { product: CheckoutProduct; quantity: number; action: string }[] = [];
 
     if (fromCart && cart.items.length > 0) {
         checkoutItems = cart.items.map((item) => ({
-            product: item.product,
+            product: item.product as CheckoutProduct,
             quantity: item.quantity,
             action: item.action,
         }));
-    } else if (productId) {
-        const found = sampleProducts.find((p) => p.id === productId);
-        if (found) {
-            checkoutItems = [{ product: found, quantity: 1, action }];
-        }
+    } else if (fetchedProduct) {
+        checkoutItems = [{ product: fetchedProduct, quantity: 1, action }];
     }
 
     const isSelling = checkoutItems.length === 1 && checkoutItems[0].action === "sell";
 
     const [seconds, setSeconds] = useState(30);
-    const [quantities, setQuantities] = useState<number[]>(
-        checkoutItems.map((item) => item.quantity)
-    );
+    const [quantities, setQuantities] = useState<number[]>([1]);
     const [checks, setChecks] = useState([false, false, false]);
     const [orderPlaced, setOrderPlaced] = useState(false);
+
+    // Sync quantities when cart items load
+    useEffect(() => {
+        if (fromCart && cart.items.length > 0) {
+            setQuantities(cart.items.map(i => i.quantity));
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [cart.items.length]);
 
     // Countdown timer
     useEffect(() => {
@@ -89,13 +129,25 @@ function CheckoutContent() {
         const price = item.action === "sell"
             ? parsePrice(item.product.bid)
             : parsePrice(item.product.ask);
-        return sum + price * quantities[idx];
+        return sum + price * (quantities[idx] ?? 1);
     }, 0);
 
     const handleConfirmOrder = () => {
         if (fromCart) cart.clearCart();
         setOrderPlaced(true);
     };
+
+    // Loading state while fetching product from API
+    if (fetchingProduct) {
+        return (
+            <section className="max-w-4xl mx-auto w-full py-20 px-6 text-center">
+                <div className="animate-pulse">
+                    <div className="h-8 bg-gray-200 rounded w-72 mx-auto mb-4" />
+                    <div className="h-4 bg-gray-100 rounded w-48 mx-auto" />
+                </div>
+            </section>
+        );
+    }
 
     // Empty state
     if (checkoutItems.length === 0 && !orderPlaced) {
@@ -133,7 +185,7 @@ function CheckoutContent() {
                     {isSelling ? "Sale Confirmed" : "Order Confirmed"}
                 </h1>
                 <p className="text-[11px] font-black uppercase tracking-widest text-gray-400 mb-2">
-                    Purchase Order #LX-{Math.floor(100000 + Math.random() * 900000)}
+                    {isSelling ? "Purchase Order" : "Order"} #LX-{Math.floor(100000 + Math.random() * 900000)}
                 </p>
                 <p className="text-sm text-gray-500 mb-8 max-w-md mx-auto">
                     {isSelling
@@ -142,10 +194,10 @@ function CheckoutContent() {
                 </p>
                 <div className="flex items-center justify-center gap-4">
                     <Link
-                        href="/orders"
+                        href={isSelling ? "/purchase-orders" : "/orders"}
                         className="bg-black text-white px-6 py-3 text-[10px] font-black uppercase tracking-widest hover:bg-zinc-800 transition-colors"
                     >
-                        View Orders
+                        {isSelling ? "View Purchase Orders" : "View Orders"}
                     </Link>
                     <Link
                         href="/explore"
@@ -374,14 +426,7 @@ function CheckoutContent() {
                                     </div>
                                 );
                             })}
-                            <div className="flex justify-between text-sm">
-                                <span className="font-bold uppercase tracking-wider text-gray-500">
-                                    Platform Fee (0.60%)
-                                </span>
-                                <span className="font-bold text-gray-400 tracking-tighter tabular-nums">
-                                    Included
-                                </span>
-                            </div>
+
                             <div className="flex justify-between text-sm">
                                 <span className="font-bold uppercase tracking-wider text-gray-500">
                                     Shipping
