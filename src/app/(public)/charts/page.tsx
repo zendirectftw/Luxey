@@ -1,26 +1,120 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useSpotPrices } from "@/context/SpotPriceContext";
 
 const METAL_CONFIG = [
-    { key: "gold" as const, name: "Gold", symbol: "XAU" },
-    { key: "silver" as const, name: "Silver", symbol: "XAG" },
-    { key: "platinum" as const, name: "Platinum", symbol: "XPT" },
-    { key: "palladium" as const, name: "Palladium", symbol: "XPD" },
+    { key: "gold" as const, name: "Gold", symbol: "XAU", tvSymbol: "OANDA:XAUUSD" },
+    { key: "silver" as const, name: "Silver", symbol: "XAG", tvSymbol: "OANDA:XAGUSD" },
+    { key: "platinum" as const, name: "Platinum", symbol: "XPT", tvSymbol: "OANDA:XPTUSD" },
+    { key: "palladium" as const, name: "Palladium", symbol: "XPD", tvSymbol: "OANDA:XPDUSD" },
 ];
 
-const timeRanges = ["1D", "1W", "1M", "3M", "1Y", "ALL"];
+type TimeRange = "1D" | "1W" | "1M" | "3M" | "1Y" | "ALL";
+const timeRanges: TimeRange[] = ["1D", "1W", "1M", "3M", "1Y", "ALL"];
+
+// Map our time ranges to TradingView intervals
+const TV_INTERVALS: Record<string, string> = {
+    "1W": "D",    // daily candles for 1 week
+    "1M": "D",    // daily candles for 1 month
+    "3M": "W",    // weekly candles for 3 months
+    "1Y": "W",    // weekly candles for 1 year
+    "ALL": "M",   // monthly candles for all time
+};
+
+const TV_RANGE: Record<string, string> = {
+    "1W": "5D",
+    "1M": "1M",
+    "3M": "3M",
+    "1Y": "12M",
+    "ALL": "60M",
+};
 
 function formatUSD(val: number): string {
-    if (val >= 1000) return "$" + val.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     return "$" + val.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+// ─── TradingView Widget ──────────────────────────────
+function TradingViewChart({ symbol, interval, range }: { symbol: string; interval: string; range: string }) {
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (!containerRef.current) return;
+
+        // Clear previous widget
+        containerRef.current.innerHTML = "";
+
+        const script = document.createElement("script");
+        script.src = "https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js";
+        script.type = "text/javascript";
+        script.async = true;
+        script.innerHTML = JSON.stringify({
+            autosize: true,
+            symbol: symbol,
+            interval: interval,
+            range: range,
+            timezone: "America/Denver",
+            theme: "light",
+            style: "2",           // line chart
+            locale: "en",
+            backgroundColor: "rgba(255, 255, 255, 1)",
+            gridColor: "rgba(245, 245, 245, 1)",
+            hide_top_toolbar: true,
+            hide_legend: false,
+            save_image: false,
+            hide_volume: true,
+            support_host: "https://www.tradingview.com",
+        });
+
+        containerRef.current.appendChild(script);
+    }, [symbol, interval, range]);
+
+    return (
+        <div className="tradingview-widget-container h-[400px]" ref={containerRef}>
+            <div className="tradingview-widget-container__widget h-full" />
+        </div>
+    );
+}
+
+// ─── 1D SVG Chart (our Kitco data) ──────────────────
+function IntraDayChart({ isUp }: { isUp: boolean }) {
+    return (
+        <div className="h-[400px] flex items-center justify-center bg-gradient-to-b from-[#FAFAFA] to-white relative">
+            <svg viewBox="0 0 800 300" className="w-full h-full px-6" preserveAspectRatio="none">
+                <defs>
+                    <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={isUp ? "#16a34a" : "#dc2626"} stopOpacity="0.1" />
+                        <stop offset="100%" stopColor={isUp ? "#16a34a" : "#dc2626"} stopOpacity="0" />
+                    </linearGradient>
+                </defs>
+                {[60, 120, 180, 240].map((y) => (
+                    <line key={y} x1="0" y1={y} x2="800" y2={y} stroke="#F5F5F5" strokeWidth="1" />
+                ))}
+                <path
+                    d={isUp
+                        ? "M0,200 C100,180 200,190 300,160 C400,130 500,150 600,100 C700,80 750,90 800,70 L800,300 L0,300 Z"
+                        : "M0,100 C100,120 200,110 300,150 C400,170 500,160 600,200 C700,210 750,220 800,230 L800,300 L0,300 Z"
+                    }
+                    fill="url(#chartGradient)"
+                />
+                <path
+                    d={isUp
+                        ? "M0,200 C100,180 200,190 300,160 C400,130 500,150 600,100 C700,80 750,90 800,70"
+                        : "M0,100 C100,120 200,110 300,150 C400,170 500,160 600,200 C700,210 750,220 800,230"
+                    }
+                    fill="none"
+                    stroke={isUp ? "#16a34a" : "#dc2626"}
+                    strokeWidth="2.5"
+                />
+            </svg>
+        </div>
+    );
 }
 
 export default function ChartsPage() {
     const { prices, loading } = useSpotPrices();
     const [activeMetal, setActiveMetal] = useState("Gold");
-    const [activeRange, setActiveRange] = useState("1D");
+    const [activeRange, setActiveRange] = useState<TimeRange>("1D");
 
     const metals = METAL_CONFIG.map((m) => {
         const mp = prices?.[m.key];
@@ -37,6 +131,7 @@ export default function ChartsPage() {
     });
 
     const selected = metals.find((m) => m.name === activeMetal)!;
+    const is1D = activeRange === "1D";
 
     return (
         <section className="max-w-7xl mx-auto w-full py-10 px-6">
@@ -73,8 +168,8 @@ export default function ChartsPage() {
                                 key={metal.name}
                                 onClick={() => setActiveMetal(metal.name)}
                                 className={`p-5 rounded-sm border text-left transition-all ${activeMetal === metal.name
-                                    ? "border-[#D4AF37] bg-black text-white shadow-lg"
-                                    : "border-[#E4E4E4] bg-white hover:border-black"
+                                        ? "border-[#D4AF37] bg-black text-white shadow-lg"
+                                        : "border-[#E4E4E4] bg-white hover:border-black"
                                     }`}
                             >
                                 <p className={`text-[9px] font-black uppercase tracking-widest mb-1 ${activeMetal === metal.name ? "text-[#D4AF37]" : "text-gray-400"
@@ -95,6 +190,7 @@ export default function ChartsPage() {
 
                     {/* Chart Area */}
                     <div className="bg-white border border-[#E4E4E4] rounded-sm overflow-hidden shadow-sm mb-10">
+                        {/* Chart Header */}
                         <div className="p-6 border-b border-[#F5F5F5] flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                             <div>
                                 <h2 className="text-lg font-black uppercase tracking-wider text-black">
@@ -111,6 +207,7 @@ export default function ChartsPage() {
                                 </div>
                             </div>
 
+                            {/* Time Range Selector */}
                             <div className="flex gap-1">
                                 {timeRanges.map((range) => (
                                     <button
@@ -125,36 +222,16 @@ export default function ChartsPage() {
                             </div>
                         </div>
 
-                        {/* Chart visualization */}
-                        <div className="h-[400px] flex items-center justify-center bg-gradient-to-b from-[#FAFAFA] to-white relative">
-                            <svg viewBox="0 0 800 300" className="w-full h-full px-6" preserveAspectRatio="none">
-                                <defs>
-                                    <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="0%" stopColor={selected.isUp ? "#16a34a" : "#dc2626"} stopOpacity="0.1" />
-                                        <stop offset="100%" stopColor={selected.isUp ? "#16a34a" : "#dc2626"} stopOpacity="0" />
-                                    </linearGradient>
-                                </defs>
-                                {[60, 120, 180, 240].map((y) => (
-                                    <line key={y} x1="0" y1={y} x2="800" y2={y} stroke="#F5F5F5" strokeWidth="1" />
-                                ))}
-                                <path
-                                    d={selected.isUp
-                                        ? "M0,200 C100,180 200,190 300,160 C400,130 500,150 600,100 C700,80 750,90 800,70 L800,300 L0,300 Z"
-                                        : "M0,100 C100,120 200,110 300,150 C400,170 500,160 600,200 C700,210 750,220 800,230 L800,300 L0,300 Z"
-                                    }
-                                    fill="url(#chartGradient)"
-                                />
-                                <path
-                                    d={selected.isUp
-                                        ? "M0,200 C100,180 200,190 300,160 C400,130 500,150 600,100 C700,80 750,90 800,70"
-                                        : "M0,100 C100,120 200,110 300,150 C400,170 500,160 600,200 C700,210 750,220 800,230"
-                                    }
-                                    fill="none"
-                                    stroke={selected.isUp ? "#16a34a" : "#dc2626"}
-                                    strokeWidth="2.5"
-                                />
-                            </svg>
-                        </div>
+                        {/* Chart: 1D = our SVG, otherwise TradingView */}
+                        {is1D ? (
+                            <IntraDayChart isUp={selected.isUp} />
+                        ) : (
+                            <TradingViewChart
+                                symbol={selected.tvSymbol}
+                                interval={TV_INTERVALS[activeRange]}
+                                range={TV_RANGE[activeRange]}
+                            />
+                        )}
                     </div>
 
                     {/* Market Data Table with Bid/Ask */}
