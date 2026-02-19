@@ -10,8 +10,8 @@ const METAL_CONFIG = [
     { key: "palladium" as const, name: "Palladium", symbol: "XPD", tvSymbol: "OANDA:XPDUSD" },
 ];
 
-type TimeRange = "1D" | "1W" | "1M" | "3M" | "1Y" | "ALL";
-const timeRanges: TimeRange[] = ["1D", "1W", "1M", "3M", "1Y", "ALL"];
+type TimeRange = "1D" | "1W" | "1M" | "3M" | "1Y" | "3Y" | "ALL";
+const timeRanges: TimeRange[] = ["1D", "1W", "1M", "3M", "1Y", "3Y", "ALL"];
 
 // Map our time ranges to TradingView intervals
 const TV_INTERVALS: Record<string, string> = {
@@ -19,6 +19,7 @@ const TV_INTERVALS: Record<string, string> = {
     "1M": "D",    // daily candles for 1 month
     "3M": "W",    // weekly candles for 3 months
     "1Y": "W",    // weekly candles for 1 year
+    "3Y": "M",    // monthly candles for 3 years
     "ALL": "M",   // monthly candles for all time
 };
 
@@ -27,6 +28,7 @@ const TV_RANGE: Record<string, string> = {
     "1M": "1M",
     "3M": "3M",
     "1Y": "12M",
+    "3Y": "36M",
     "ALL": "60M",
 };
 
@@ -168,8 +170,8 @@ export default function ChartsPage() {
                                 key={metal.name}
                                 onClick={() => setActiveMetal(metal.name)}
                                 className={`p-5 rounded-sm border text-left transition-all ${activeMetal === metal.name
-                                        ? "border-[#D4AF37] bg-black text-white shadow-lg"
-                                        : "border-[#E4E4E4] bg-white hover:border-black"
+                                    ? "border-[#D4AF37] bg-black text-white shadow-lg"
+                                    : "border-[#E4E4E4] bg-white hover:border-black"
                                     }`}
                             >
                                 <p className={`text-[9px] font-black uppercase tracking-widest mb-1 ${activeMetal === metal.name ? "text-[#D4AF37]" : "text-gray-400"
