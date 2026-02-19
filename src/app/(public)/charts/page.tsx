@@ -73,18 +73,19 @@ function TradingViewChart({ symbol, interval, range }: { symbol: string; interva
 
     return (
         <div
-            className="tradingview-widget-container"
-            style={{ height: "400px", minHeight: "400px", overflow: "hidden" }}
+            style={{ position: "relative", height: "400px", width: "100%", overflow: "hidden" }}
             ref={containerRef}
         >
             <style>{`
+                .tradingview-widget-container,
+                .tradingview-widget-container__widget,
+                .tradingview-widget-container > div,
                 .tradingview-widget-container iframe {
-                    height: 100% !important;
+                    position: absolute !important;
+                    top: 0 !important;
+                    left: 0 !important;
                     width: 100% !important;
-                }
-                .tradingview-widget-container__widget {
                     height: 100% !important;
-                    width: 100% !important;
                 }
             `}</style>
             <div className="tradingview-widget-container__widget" style={{ height: "100%", width: "100%" }} />
