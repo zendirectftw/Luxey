@@ -1,9 +1,28 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import {
+    attributeGroups,
+    weightLabelToOz,
+    ozToWeightLabel,
+    purityLabelToNumber,
+    numberToPurityLabel,
+    getAttributeGroup,
+} from "@/lib/productAttributes";
+
+interface StorageFile {
+    name: string;
+    url: string;
+}
+
+interface ProductImage {
+    url: string;
+    fileName: string;
+    isDefault: boolean;
+}
 
 export default function CreateProductPage() {
     const router = useRouter();
@@ -14,68 +33,183 @@ export default function CreateProductPage() {
     // Form state
     const [name, setName] = useState("");
     const [description, setDescription] = useState("");
-    const [metal, setMetal] = useState("gold");
-    const [weight, setWeight] = useState("");
-    const [purity, setPurity] = useState("0.9999");
+    const [metal, setMetal] = useState("Gold");
+    const [weightLabel, setWeightLabel] = useState("1 oz");
+    const [purityLabel, setPurityLabel] = useState(".9999 Fine");
     const [mint, setMint] = useState("");
-    const [category, setCategory] = useState("bar");
+    const [category, setCategory] = useState("Bar");
     const [year, setYear] = useState("");
     const [isActive, setIsActive] = useState(false);
 
-    // Image management
-    const [images, setImages] = useState<{ url: string; isDefault: boolean }[]>([]);
-    const [imgUrl, setImgUrl] = useState("");
+    // Image management – storage bucket browser
+    const [bucketFiles, setBucketFiles] = useState<StorageFile[]>([]);
+    const [loadingFiles, setLoadingFiles] = useState(true);
+    const [selectedImages, setSelectedImages] = useState<ProductImage[]>([]);
+    const [dragIdx, setDragIdx] = useState<number | null>(null);
 
-    const addImage = () => {
-        if (!imgUrl.trim()) return;
-        setImages(prev => [...prev, { url: imgUrl, isDefault: prev.length === 0 }]);
-        setImgUrl("");
+    const generateSlug = (name: string) =>
+        name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+
+    const slug = generateSlug(name);
+
+    // ─── Load bucket files on mount ─────────────────────
+    useEffect(() => {
+        async function loadBucketFiles() {
+            setLoadingFiles(true);
+            const { data, error: listError } = await supabase.storage
+                .from("product-images")
+                .list("products", { limit: 200, sortBy: { column: "name", order: "asc" } });
+
+            if (listError || !data) {
+                // Try root if "products" folder doesn't exist
+                const { data: rootData } = await supabase.storage
+                    .from("product-images")
+                    .list("", { limit: 200, sortBy: { column: "name", order: "asc" } });
+
+                if (rootData) {
+                    const files: StorageFile[] = rootData
+                        .filter(f => f.name && !f.name.startsWith("."))
+                        .map(f => ({
+                            name: f.name,
+                            url: supabase.storage.from("product-images").getPublicUrl(f.name).data.publicUrl,
+                        }));
+                    setBucketFiles(files);
+                }
+            } else {
+                const files: StorageFile[] = data
+                    .filter(f => f.name && !f.name.startsWith("."))
+                    .map(f => ({
+                        name: f.name,
+                        url: supabase.storage.from("product-images").getPublicUrl(`products/${f.name}`).data.publicUrl,
+                    }));
+                setBucketFiles(files);
+            }
+            setLoadingFiles(false);
+        }
+        loadBucketFiles();
+    }, []);
+
+    // ─── Image selection ────────────────────────────────
+    const toggleImage = (file: StorageFile) => {
+        setSelectedImages(prev => {
+            const exists = prev.find(img => img.fileName === file.name);
+            if (exists) {
+                const next = prev.filter(img => img.fileName !== file.name);
+                if (exists.isDefault && next.length > 0) next[0].isDefault = true;
+                return next;
+            }
+            return [...prev, { url: file.url, fileName: file.name, isDefault: prev.length === 0 }];
+        });
+    };
+
+    const setDefault = (index: number) => {
+        setSelectedImages(prev => prev.map((img, i) => ({ ...img, isDefault: i === index })));
     };
 
     const removeImage = (index: number) => {
-        setImages(prev => {
+        setSelectedImages(prev => {
             const next = prev.filter((_, i) => i !== index);
             if (prev[index].isDefault && next.length > 0) next[0].isDefault = true;
             return next;
         });
     };
 
-    const setDefault = (index: number) => {
-        setImages(prev => prev.map((img, i) => ({ ...img, isDefault: i === index })));
+    // ─── Drag reorder ───────────────────────────────────
+    const handleDragStart = (index: number) => setDragIdx(index);
+    const handleDragOver = (e: React.DragEvent, index: number) => {
+        e.preventDefault();
+        if (dragIdx === null || dragIdx === index) return;
+        setSelectedImages(prev => {
+            const next = [...prev];
+            const [moved] = next.splice(dragIdx, 1);
+            next.splice(index, 0, moved);
+            return next;
+        });
+        setDragIdx(index);
     };
+    const handleDragEnd = () => setDragIdx(null);
 
-    const generateSlug = (name: string) => {
-        return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-    };
+    // ─── Auto-create dealer mappings + live_quotes ──────
+    const createDealerMappings = useCallback(async (productId: string) => {
+        const { data: dealers } = await supabase
+            .from("dealers")
+            .select("id, code, spot_offset")
+            .eq("is_active", true);
 
+        if (!dealers || dealers.length === 0) return;
+
+        const mappings = dealers.map(d => ({
+            dealer_id: d.id,
+            product_id: productId,
+            is_active: true,
+        }));
+
+        await supabase
+            .from("dealer_product_mapping")
+            .upsert(mappings, { onConflict: "dealer_id,product_id" });
+
+        const weightOz = weightLabelToOz(weightLabel);
+        const metalLower = metal.toLowerCase();
+        const getPremium = (dealerCode: string) => {
+            const basePremiums: Record<string, Record<string, number>> = {
+                UGC: { gold_bulk: 0.80, gold_mid: 1.20, gold_1oz: 1.50, silver: 3.50, platinum: 2.50, other: 2.00 },
+                APMEX: { gold_bulk: 1.20, gold_mid: 1.80, gold_1oz: 2.20, silver: 4.50, platinum: 3.50, other: 3.00 },
+                AMARK: { gold_bulk: 1.50, gold_mid: 2.00, gold_1oz: 2.50, silver: 5.00, platinum: 4.00, other: 3.50 },
+            };
+            const p = basePremiums[dealerCode] || basePremiums.AMARK;
+            if (metalLower === "gold" && weightOz >= 10) return p.gold_bulk;
+            if (metalLower === "gold" && weightOz >= 3) return p.gold_mid;
+            if (metalLower === "gold") return p.gold_1oz;
+            if (metalLower === "silver") return p.silver;
+            if (metalLower === "platinum") return p.platinum;
+            return p.other;
+        };
+
+        const quotes = dealers.map(d => ({
+            dealer_id: d.id,
+            product_id: productId,
+            kitco_spot: 0,
+            dealer_adjustment: d.spot_offset,
+            premium: getPremium(d.code),
+            bid_price: 0,
+            ask_price: 0,
+            effective_premium_vs_kitco: getPremium(d.code),
+        }));
+
+        await supabase
+            .from("live_quotes")
+            .upsert(quotes, { onConflict: "dealer_id,product_id" });
+    }, [metal, weightLabel]);
+
+    // ─── Save product ───────────────────────────────────
     const handleSave = async (publish: boolean) => {
-        if (!name.trim()) {
-            setError("Product name is required");
-            return;
-        }
-        if (!weight.trim()) {
-            setError("Weight is required");
-            return;
-        }
+        if (!name.trim()) { setError("Product name is required"); return; }
 
         setSaving(true);
         setError(null);
 
-        const defaultImage = images.find(img => img.isDefault);
+        const defaultImage = selectedImages.find(img => img.isDefault);
+        const imagesJson = selectedImages.map((img, i) => ({
+            url: img.url,
+            file_name: img.fileName,
+            position: i,
+            is_default: img.isDefault,
+        }));
 
-        const { error: insertError } = await supabase.from("products").insert({
+        const { data, error: insertError } = await supabase.from("products").insert({
             name: name.trim(),
             slug: generateSlug(name),
-            metal,
-            category,
-            weight_oz: parseFloat(weight) || 0,
-            purity: parseFloat(purity) || 0.9999,
-            mint: mint.trim() || null,
+            metal: metal.toLowerCase(),
+            category: category.toLowerCase().replace(" ", "_"),
+            weight_oz: weightLabelToOz(weightLabel),
+            purity: purityLabelToNumber(purityLabel),
+            mint: mint || null,
             year: year ? parseInt(year) : null,
             image_url: defaultImage?.url || null,
+            images: imagesJson,
             description: description.trim() || null,
             is_active: publish,
-        });
+        }).select("id").single();
 
         if (insertError) {
             setError(insertError.message);
@@ -83,9 +217,20 @@ export default function CreateProductPage() {
             return;
         }
 
+        if (data?.id) {
+            await createDealerMappings(data.id);
+        }
+
         setSaved(true);
         setTimeout(() => router.push("/admin/products"), 1000);
     };
+
+    // ─── Attribute group lookups ─────────────────────────
+    const metalGroup = getAttributeGroup("metal")!;
+    const weightGroup = getAttributeGroup("weight_oz")!;
+    const purityGroup = getAttributeGroup("purity")!;
+    const mintGroup = getAttributeGroup("mint")!;
+    const categoryGroup = getAttributeGroup("category")!;
 
     return (
         <>
@@ -145,6 +290,11 @@ export default function CreateProductPage() {
                                             onChange={(e) => setName(e.target.value)}
                                             className="form-input"
                                         />
+                                        {name.trim() && (
+                                            <p className="mt-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                                                Slug: <span className="font-mono text-gray-600">{slug}</span>
+                                            </p>
+                                        )}
                                     </div>
                                     <div>
                                         <label className="form-label">Description</label>
@@ -168,49 +318,42 @@ export default function CreateProductPage() {
                                     <div>
                                         <label className="form-label">Metal Type</label>
                                         <select className="form-input" value={metal} onChange={(e) => setMetal(e.target.value)}>
-                                            <option value="gold">Gold</option>
-                                            <option value="silver">Silver</option>
-                                            <option value="platinum">Platinum</option>
-                                            <option value="palladium">Palladium</option>
+                                            {metalGroup.items.map(item => (
+                                                <option key={item} value={item}>{item}</option>
+                                            ))}
                                         </select>
                                     </div>
                                     <div>
-                                        <label className="form-label">Weight (Troy oz)</label>
-                                        <input
-                                            type="number"
-                                            step="0.01"
-                                            placeholder="e.g. 1"
-                                            value={weight}
-                                            onChange={(e) => setWeight(e.target.value)}
-                                            className="form-input"
-                                        />
+                                        <label className="form-label">Weight</label>
+                                        <select className="form-input" value={weightLabel} onChange={(e) => setWeightLabel(e.target.value)}>
+                                            {weightGroup.items.map(item => (
+                                                <option key={item} value={item}>{item}</option>
+                                            ))}
+                                        </select>
                                     </div>
                                     <div>
                                         <label className="form-label">Purity</label>
-                                        <input
-                                            type="text"
-                                            placeholder="e.g. 0.9999"
-                                            value={purity}
-                                            onChange={(e) => setPurity(e.target.value)}
-                                            className="form-input"
-                                        />
+                                        <select className="form-input" value={purityLabel} onChange={(e) => setPurityLabel(e.target.value)}>
+                                            {purityGroup.items.map(item => (
+                                                <option key={item} value={item}>{item}</option>
+                                            ))}
+                                        </select>
                                     </div>
                                     <div>
                                         <label className="form-label">Mint</label>
-                                        <input
-                                            type="text"
-                                            placeholder="e.g. PAMP Suisse"
-                                            value={mint}
-                                            onChange={(e) => setMint(e.target.value)}
-                                            className="form-input"
-                                        />
+                                        <select className="form-input" value={mint} onChange={(e) => setMint(e.target.value)}>
+                                            <option value="">— Select —</option>
+                                            {mintGroup.items.map(item => (
+                                                <option key={item} value={item}>{item}</option>
+                                            ))}
+                                        </select>
                                     </div>
                                     <div>
                                         <label className="form-label">Category</label>
                                         <select className="form-input" value={category} onChange={(e) => setCategory(e.target.value)}>
-                                            <option value="bar">Bar</option>
-                                            <option value="coin">Coin</option>
-                                            <option value="round">Round</option>
+                                            {categoryGroup.items.map(item => (
+                                                <option key={item} value={item}>{item}</option>
+                                            ))}
                                         </select>
                                     </div>
                                     <div>
@@ -248,58 +391,115 @@ export default function CreateProductPage() {
                                 </div>
                             </div>
 
-                            {/* Product Gallery */}
+                            {/* Product Gallery — Storage Bucket Picker */}
                             <div className="bg-white p-8 border border-[#E4E4E4] shadow-sm rounded-sm">
                                 <h3 className="text-[11px] font-black uppercase tracking-widest mb-6">Product Gallery</h3>
-                                <div className="space-y-4">
-                                    <div className="flex gap-2">
-                                        <input
-                                            type="text"
-                                            placeholder="Paste Image URL"
-                                            className="form-input text-xs"
-                                            value={imgUrl}
-                                            onChange={(e) => setImgUrl(e.target.value)}
-                                        />
-                                        <button
-                                            onClick={addImage}
-                                            className="bg-black text-white px-4 text-sm font-bold shrink-0"
-                                        >
-                                            +
-                                        </button>
-                                    </div>
 
-                                    {/* Image Grid */}
-                                    <div className="grid grid-cols-2 gap-4 pt-4">
-                                        {images.map((img, i) => (
-                                            <div
-                                                key={i}
-                                                onClick={() => setDefault(i)}
-                                                className={`img-card cursor-pointer group ${img.isDefault ? "is-default" : ""}`}
-                                            >
-                                                <div className="default-badge">DEFAULT</div>
-                                                <div className="aspect-square bg-gray-50 flex items-center justify-center p-2">
-                                                    <Image
-                                                        src={img.url}
-                                                        alt="Product"
-                                                        width={120}
-                                                        height={120}
-                                                        className="max-w-full max-h-full object-contain mix-blend-multiply"
-                                                    />
-                                                </div>
-                                                <button
-                                                    onClick={(e) => { e.stopPropagation(); removeImage(i); }}
-                                                    className="absolute -top-2 -right-2 bg-red-500 text-white w-5 h-5 rounded-full text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"
-                                                >
-                                                    ×
-                                                </button>
-                                            </div>
-                                        ))}
-                                    </div>
-
-                                    {images.length > 0 && (
-                                        <p className="text-[9px] text-gray-400 uppercase font-black text-center mt-4">
-                                            Click an image to set as default
+                                {/* Selected images (reorderable) */}
+                                {selectedImages.length > 0 && (
+                                    <div className="space-y-2 mb-6">
+                                        <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-3">
+                                            Selected — drag to reorder, click ★ for default
                                         </p>
+                                        <div className="space-y-2">
+                                            {selectedImages.map((img, i) => (
+                                                <div
+                                                    key={img.fileName}
+                                                    draggable
+                                                    onDragStart={() => handleDragStart(i)}
+                                                    onDragOver={(e) => handleDragOver(e, i)}
+                                                    onDragEnd={handleDragEnd}
+                                                    className={`flex items-center gap-3 p-3 border rounded-sm cursor-grab active:cursor-grabbing transition-all ${img.isDefault
+                                                            ? "border-black bg-gray-50"
+                                                            : "border-[#E4E4E4] hover:border-gray-400"
+                                                        } ${dragIdx === i ? "opacity-50" : ""}`}
+                                                >
+                                                    <span className="text-gray-300 text-xs">⠿</span>
+                                                    <div className="w-10 h-10 bg-gray-50 flex items-center justify-center shrink-0">
+                                                        <Image
+                                                            src={img.url}
+                                                            alt={img.fileName}
+                                                            width={40}
+                                                            height={40}
+                                                            className="max-w-full max-h-full object-contain mix-blend-multiply"
+                                                        />
+                                                    </div>
+                                                    <span className="text-[10px] font-bold text-gray-600 flex-1 truncate">
+                                                        {img.fileName}
+                                                    </span>
+                                                    <button
+                                                        onClick={() => setDefault(i)}
+                                                        className={`text-sm transition-colors ${img.isDefault ? "text-yellow-500" : "text-gray-300 hover:text-yellow-400"
+                                                            }`}
+                                                        title="Set as default"
+                                                    >
+                                                        ★
+                                                    </button>
+                                                    <button
+                                                        onClick={() => removeImage(i)}
+                                                        className="text-gray-300 hover:text-red-500 text-sm transition-colors"
+                                                        title="Remove"
+                                                    >
+                                                        ×
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Bucket file browser */}
+                                <div>
+                                    <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-3">
+                                        Storage Bucket — click to select
+                                    </p>
+                                    {loadingFiles ? (
+                                        <div className="text-center py-8">
+                                            <div className="w-6 h-6 border-2 border-black border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                                            <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Loading files...</p>
+                                        </div>
+                                    ) : bucketFiles.length === 0 ? (
+                                        <div className="text-center py-8 border-2 border-dashed border-[#E4E4E4] rounded-sm">
+                                            <p className="text-2xl mb-2">📁</p>
+                                            <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+                                                No files in storage bucket
+                                            </p>
+                                            <p className="text-[9px] font-bold text-gray-300 uppercase mt-1">
+                                                Upload images via Supabase Dashboard
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <div className="grid grid-cols-3 gap-2">
+                                            {bucketFiles.map(file => {
+                                                const isSelected = selectedImages.some(img => img.fileName === file.name);
+                                                return (
+                                                    <button
+                                                        key={file.name}
+                                                        onClick={() => toggleImage(file)}
+                                                        className={`group relative aspect-square bg-gray-50 border-2 rounded-sm p-1 transition-all ${isSelected
+                                                                ? "border-black ring-1 ring-black"
+                                                                : "border-[#E4E4E4] hover:border-gray-400"
+                                                            }`}
+                                                    >
+                                                        <Image
+                                                            src={file.url}
+                                                            alt={file.name}
+                                                            width={80}
+                                                            height={80}
+                                                            className="w-full h-full object-contain mix-blend-multiply"
+                                                        />
+                                                        {isSelected && (
+                                                            <div className="absolute top-1 right-1 w-4 h-4 bg-black rounded-full flex items-center justify-center">
+                                                                <span className="text-white text-[8px] font-black">✓</span>
+                                                            </div>
+                                                        )}
+                                                        <p className="absolute bottom-0 left-0 right-0 bg-white/90 text-[7px] font-bold text-gray-500 text-center py-0.5 truncate px-1">
+                                                            {file.name}
+                                                        </p>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
                                     )}
                                 </div>
                             </div>
