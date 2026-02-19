@@ -134,6 +134,7 @@ async function persistSpotPrices(prices: SpotPricesResponse) {
         { key: "gold", dbMetal: "gold" },
         { key: "silver", dbMetal: "silver" },
         { key: "platinum", dbMetal: "platinum" },
+        { key: "palladium", dbMetal: "palladium" },
     ];
 
     const now = prices.fetchedAt;
