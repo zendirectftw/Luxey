@@ -1,12 +1,18 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
 export const revalidate = 15;
 
-const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-);
+let _supabase: SupabaseClient | null = null;
+function getSupabase() {
+    if (!_supabase) {
+        _supabase = createClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        );
+    }
+    return _supabase;
+}
 
 // ─── PREFERRED DEALER RULE ──────────────────────────
 // Prefer APMEX (LUXEY - OKC) unless their bid is >5% lower than the best alternative
@@ -59,7 +65,7 @@ export async function GET(request: Request) {
     const spotData = await spotRes.json();
 
     // 2. Fetch products (optionally filtered by ID)
-    let productsQuery = supabase
+    let productsQuery = getSupabase()
         .from("products")
         .select("id, name, slug, metal, category, weight_oz, purity, image_url, mint, is_active")
         .eq("is_active", true);
@@ -75,7 +81,7 @@ export async function GET(request: Request) {
 
     // 3. Fetch all live_quotes with dealer join
     const productIds = products.map((p) => p.id);
-    const { data: quotes } = await supabase
+    const { data: quotes } = await getSupabase()
         .from("live_quotes")
         .select("*, dealers!inner(id, display_name, display_city, code, spot_offset)")
         .in("product_id", productIds);

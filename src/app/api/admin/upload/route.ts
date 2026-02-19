@@ -1,11 +1,17 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 
 // Initialize Supabase Admin client (Service Role) to bypass RLS
-const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-    process.env.SUPABASE_SERVICE_ROLE_KEY || ''
-);
+let _supabaseAdmin: SupabaseClient | null = null;
+function getSupabaseAdmin() {
+    if (!_supabaseAdmin) {
+        _supabaseAdmin = createClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY!
+        );
+    }
+    return _supabaseAdmin;
+}
 
 export async function POST(request: Request) {
     try {
@@ -25,7 +31,7 @@ export async function POST(request: Request) {
         const arrayBuffer = await file.arrayBuffer();
         const fileBuffer = new Uint8Array(arrayBuffer);
 
-        const { data, error } = await supabaseAdmin.storage
+        const { data, error } = await getSupabaseAdmin().storage
             .from("product-images")
             .upload(filePath, fileBuffer, {
                 contentType: file.type,
@@ -38,7 +44,7 @@ export async function POST(request: Request) {
         }
 
         // Get public URL
-        const { data: { publicUrl } } = supabaseAdmin.storage
+        const { data: { publicUrl } } = getSupabaseAdmin().storage
             .from("product-images")
             .getPublicUrl(filePath);
 

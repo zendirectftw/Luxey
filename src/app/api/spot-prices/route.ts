@@ -1,12 +1,18 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
 export const revalidate = 15; // ISR: cache for 15s
 
-const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-);
+let _supabase: SupabaseClient | null = null;
+function getSupabase() {
+    if (!_supabase) {
+        _supabase = createClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        );
+    }
+    return _supabase;
+}
 
 interface MetalPrice {
     bid: number;
@@ -143,13 +149,13 @@ async function persistSpotPrices(prices: SpotPricesResponse) {
         const metal = prices[key] as MetalPrice;
         if (metal.bid > 0) {
             // Upsert current spot_prices (latest values)
-            await supabase
+            await getSupabase()
                 .from("spot_prices")
                 .upsert(
                     { metal: dbMetal, price: metal.bid, source: prices.source + "_bid", fetched_at: now },
                     { onConflict: "metal,source" }
                 );
-            await supabase
+            await getSupabase()
                 .from("spot_prices")
                 .upsert(
                     { metal: dbMetal, price: metal.ask, source: prices.source + "_ask", fetched_at: now },
@@ -157,7 +163,7 @@ async function persistSpotPrices(prices: SpotPricesResponse) {
                 );
 
             // Append to spot_price_history (every scrape is logged)
-            await supabase.from("spot_price_history").insert({
+            await getSupabase().from("spot_price_history").insert({
                 metal: dbMetal,
                 bid: metal.bid,
                 ask: metal.ask,
