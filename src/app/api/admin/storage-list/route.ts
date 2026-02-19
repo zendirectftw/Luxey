@@ -3,8 +3,8 @@ import { NextResponse } from "next/server";
 
 // Uses the service role key (server-side only) to bypass RLS on storage
 const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+    process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 );
 
 export async function GET() {

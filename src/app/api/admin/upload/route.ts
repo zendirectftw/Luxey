@@ -3,8 +3,8 @@ import { NextResponse } from "next/server";
 
 // Initialize Supabase Admin client (Service Role) to bypass RLS
 const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+    process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 );
 
 export async function POST(request: Request) {
@@ -42,9 +42,9 @@ export async function POST(request: Request) {
             .from("product-images")
             .getPublicUrl(filePath);
 
-        return NextResponse.json({ 
-            url: publicUrl, 
-            name: fileName 
+        return NextResponse.json({
+            url: publicUrl,
+            name: fileName
         });
 
     } catch (error: any) {
