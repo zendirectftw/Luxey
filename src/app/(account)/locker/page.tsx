@@ -1,36 +1,77 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import Image from "next/image";
+import { supabase } from "@/lib/supabase";
+import { DEMO_USER_ID } from "@/lib/constants";
 
-export const metadata = { title: "My Locker | Luxey© Secure Custody" };
-
-const portfolioStats = [
-    { label: "Total Items in Custody", value: "142" },
-    { label: "Total Trays Secured", value: "06" },
-    { label: "Portfolio Total Value", value: "$342,850", green: true },
-    { label: "Total Change in Value", value: "+$12,400", green: true, growth: "+3.8%" },
-];
-
-interface Slot {
-    occupied: boolean;
-    desc?: string;
-    serial?: string;
-    value?: string;
-    img?: string;
+interface VaultItem {
+    id: string;
+    po_number: string;
+    serial_number: string | null;
+    seller_lock_price: number;
+    products: { name: string; image_url: string | null } | null;
 }
 
-const traySlots: Slot[] = [
-    { occupied: true, desc: "1 oz Gold Buffalo BU (2024)", serial: "BUF-2024-AX8821", value: "$2,836.00", img: "https://aouokhwqjizbcoutydig.supabase.co/storage/v1/object/public/product-image/Buffalo%20Rev.jpg" },
-    { occupied: true, desc: "1 oz Gold Eagle BU (2024)", serial: "EAG-2024-KM7742", value: "$2,839.00", img: "https://aouokhwqjizbcoutydig.supabase.co/storage/v1/object/public/product-image/Gold%20Eagle%20rev.jpg" },
-    { occupied: true, desc: "1 oz PAMP Lady Fortuna (2023)", serial: "PMP-2023-QR3310", value: "$2,841.50", img: "https://aouokhwqjizbcoutydig.supabase.co/storage/v1/object/public/product-image/Pamp%20Footprint.jpg" },
-    { occupied: true, desc: "100g Valcambi Gold Bar (2024)", serial: "VCB-2024-TT1293", value: "$9,125.00", img: "https://aouokhwqjizbcoutydig.supabase.co/storage/v1/object/public/product-image/Valcambi%20100%20gm%20Gold%20Bar.png" },
-    { occupied: true, desc: "1 oz Gold Krugerrand (2023)", serial: "KRG-2023-FL8800", value: "$2,833.00", img: "https://aouokhwqjizbcoutydig.supabase.co/storage/v1/object/public/product-image/Rand%20Refinery%201%20oz%20Gold%20Bar.png" },
-    { occupied: true, desc: "10 oz RCM Gold Bar (2024)", serial: "RCM-2024-BB6177", value: "$28,360.00", img: "https://aouokhwqjizbcoutydig.supabase.co/storage/v1/object/public/product-image/Perth%20Mint%201%20oz%20Gold%20Bar.png" },
-    { occupied: true, desc: "1 oz Austrian Philharmonic (2024)", serial: "PHI-2024-ZN2251", value: "$2,834.00", img: "https://aouokhwqjizbcoutydig.supabase.co/storage/v1/object/public/product-image/Gold%20Eagle%20rev.jpg" },
-    { occupied: true, desc: "1 oz Canadian Maple Leaf (2024)", serial: "MPL-2024-VV0012", value: "$2,838.00", img: "https://aouokhwqjizbcoutydig.supabase.co/storage/v1/object/public/product-image/Buffalo%20Rev.jpg" },
-    ...Array.from({ length: 17 }, () => ({ occupied: false })),
-];
-
 export default function LockerPage() {
-    const trayValue = traySlots.filter(s => s.occupied).reduce((acc) => acc, "$54,506.50");
+    const [items, setItems] = useState<VaultItem[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        async function load() {
+            const { data } = await supabase
+                .from("purchase_orders")
+                .select("id, po_number, serial_number, seller_lock_price, products(name, image_url)")
+                .eq("seller_id", DEMO_USER_ID)
+                .eq("status", "seller_paid")
+                .order("created_at", { ascending: false });
+
+            setItems((data as unknown as VaultItem[]) || []);
+            setLoading(false);
+        }
+        load();
+    }, []);
+
+    const fmt = (n: number) => "$" + Number(n).toLocaleString("en-US", { minimumFractionDigits: 2 });
+
+    if (loading) {
+        return (
+            <div className="max-w-7xl mx-auto w-full py-8 px-6">
+                <div className="flex items-center justify-center min-h-[400px]">
+                    <div className="w-8 h-8 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                </div>
+            </div>
+        );
+    }
+
+    const totalValue = items.reduce((s, i) => s + Number(i.seller_lock_price), 0);
+    const totalItems = items.length;
+    const totalTrays = Math.ceil(totalItems / 25);
+
+    // Build 25-slot tray from the first 25 items
+    const SLOTS = 25;
+    const traySlots = Array.from({ length: SLOTS }, (_, i) => {
+        const item = items[i];
+        if (item) {
+            return {
+                occupied: true,
+                desc: item.products?.name || "Unknown",
+                serial: item.serial_number || "—",
+                value: fmt(item.seller_lock_price),
+                img: item.products?.image_url || null,
+            };
+        }
+        return { occupied: false, desc: undefined, serial: undefined, value: undefined, img: null };
+    });
+
+    const trayValue = items.slice(0, SLOTS).reduce((s, i) => s + Number(i.seller_lock_price), 0);
+
+    const portfolioStats = [
+        { label: "Total Items in Custody", value: String(totalItems).padStart(3, "0") },
+        { label: "Total Trays Secured", value: String(totalTrays).padStart(2, "0") },
+        { label: "Portfolio Total Value", value: fmt(totalValue), green: true },
+        { label: "Total Change in Value", value: "+$0", green: true, growth: "(—)" },
+    ];
 
     return (
         <div className="max-w-7xl mx-auto w-full py-8 px-6">
@@ -70,12 +111,12 @@ export default function LockerPage() {
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
                 <div className="flex items-center gap-4">
                     <select className="luxey-select bg-white border border-[#E4E4E4] px-6 py-3 pr-12 rounded-sm text-sm font-bold uppercase tracking-widest">
-                        <option>Tray A — Gold Coins</option>
-                        <option>Tray B — Gold Bars</option>
-                        <option>Tray C — Silver</option>
+                        <option>Tray A — Items 1-25</option>
+                        {totalTrays > 1 && <option>Tray B — Items 26-50</option>}
+                        {totalTrays > 2 && <option>Tray C — Items 51-75</option>}
                     </select>
                     <div className="text-[10px] font-black uppercase tracking-widest text-gray-400">
-                        Tray Market Value: <span className="text-black text-base font-black ml-1">$54,506.50</span>
+                        Tray Market Value: <span className="text-black text-base font-black ml-1">{fmt(trayValue)}</span>
                     </div>
                 </div>
                 <button className="vault-action-btn">Sell Tray</button>
@@ -99,13 +140,17 @@ export default function LockerPage() {
                                 <>
                                     <div className="flex-1 flex items-center justify-center mb-2">
                                         <div className="w-12 h-12 bg-[#FAFAFA] rounded border border-[#E4E4E4] p-1 flex items-center justify-center">
-                                            <Image
-                                                src={slot.img!}
-                                                alt={slot.desc!}
-                                                width={40}
-                                                height={40}
-                                                className="object-contain mix-blend-multiply"
-                                            />
+                                            {slot.img ? (
+                                                <Image
+                                                    src={slot.img}
+                                                    alt={slot.desc || "Product"}
+                                                    width={40}
+                                                    height={40}
+                                                    className="object-contain mix-blend-multiply"
+                                                />
+                                            ) : (
+                                                <span className="text-gray-300 text-lg">🪙</span>
+                                            )}
                                         </div>
                                     </div>
                                     <div className="space-y-0.5">

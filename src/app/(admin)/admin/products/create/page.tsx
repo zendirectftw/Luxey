@@ -2,14 +2,28 @@
 
 import Image from "next/image";
 import { useState } from "react";
-
-const initialImages = [
-    { url: "https://aouokhwqjizbcoutydig.supabase.co/storage/v1/object/public/product-image/Pamp%20Footprint.jpg", isDefault: true },
-    { url: "https://aouokhwqjizbcoutydig.supabase.co/storage/v1/object/public/product-image/Pamp%20Footprint%20Rev.jpg", isDefault: false },
-];
+import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
 
 export default function CreateProductPage() {
-    const [images, setImages] = useState(initialImages);
+    const router = useRouter();
+    const [saving, setSaving] = useState(false);
+    const [saved, setSaved] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    // Form state
+    const [name, setName] = useState("");
+    const [description, setDescription] = useState("");
+    const [metal, setMetal] = useState("gold");
+    const [weight, setWeight] = useState("");
+    const [purity, setPurity] = useState("0.9999");
+    const [mint, setMint] = useState("");
+    const [category, setCategory] = useState("bar");
+    const [year, setYear] = useState("");
+    const [isActive, setIsActive] = useState(false);
+
+    // Image management
+    const [images, setImages] = useState<{ url: string; isDefault: boolean }[]>([]);
     const [imgUrl, setImgUrl] = useState("");
 
     const addImage = () => {
@@ -30,6 +44,49 @@ export default function CreateProductPage() {
         setImages(prev => prev.map((img, i) => ({ ...img, isDefault: i === index })));
     };
 
+    const generateSlug = (name: string) => {
+        return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+    };
+
+    const handleSave = async (publish: boolean) => {
+        if (!name.trim()) {
+            setError("Product name is required");
+            return;
+        }
+        if (!weight.trim()) {
+            setError("Weight is required");
+            return;
+        }
+
+        setSaving(true);
+        setError(null);
+
+        const defaultImage = images.find(img => img.isDefault);
+
+        const { error: insertError } = await supabase.from("products").insert({
+            name: name.trim(),
+            slug: generateSlug(name),
+            metal,
+            category,
+            weight_oz: parseFloat(weight) || 0,
+            purity: parseFloat(purity) || 0.9999,
+            mint: mint.trim() || null,
+            year: year ? parseInt(year) : null,
+            image_url: defaultImage?.url || null,
+            description: description.trim() || null,
+            is_active: publish,
+        });
+
+        if (insertError) {
+            setError(insertError.message);
+            setSaving(false);
+            return;
+        }
+
+        setSaved(true);
+        setTimeout(() => router.push("/admin/products"), 1000);
+    };
+
     return (
         <>
             {/* Header */}
@@ -39,12 +96,30 @@ export default function CreateProductPage() {
                     <span className="text-gray-300">/</span>
                     <span className="text-xs font-bold text-gray-500 uppercase">Create New Listing</span>
                 </div>
-                <div className="flex gap-4">
-                    <button className="px-6 py-2 text-[10px] font-black uppercase border border-[#E4E4E4] hover:bg-gray-50 transition-all tracking-widest">
+                <div className="flex items-center gap-3">
+                    {error && (
+                        <span className="text-[10px] font-black text-red-600 uppercase tracking-widest">
+                            ✕ {error}
+                        </span>
+                    )}
+                    {saved && (
+                        <span className="text-[10px] font-black text-green-600 uppercase tracking-widest animate-pulse">
+                            ✓ Product Created!
+                        </span>
+                    )}
+                    <button
+                        onClick={() => handleSave(false)}
+                        disabled={saving}
+                        className="px-6 py-2 text-[10px] font-black uppercase border border-[#E4E4E4] hover:bg-gray-50 transition-all tracking-widest disabled:opacity-50"
+                    >
                         Save Draft
                     </button>
-                    <button className="px-8 py-2 text-[10px] font-black uppercase bg-black text-white shadow-lg hover:shadow-xl transition-all tracking-widest">
-                        Publish Product
+                    <button
+                        onClick={() => handleSave(true)}
+                        disabled={saving}
+                        className="px-8 py-2 text-[10px] font-black uppercase bg-black text-white shadow-lg hover:shadow-xl transition-all tracking-widest disabled:opacity-50"
+                    >
+                        {saving ? "Publishing..." : "Publish Product"}
                     </button>
                 </div>
             </header>
@@ -63,11 +138,23 @@ export default function CreateProductPage() {
                                 <div className="space-y-6">
                                     <div>
                                         <label className="form-label">Product Name</label>
-                                        <input type="text" placeholder="e.g. 1 oz PAMP Fortuna Gold Bar" className="form-input" />
+                                        <input
+                                            type="text"
+                                            placeholder="e.g. 1 oz PAMP Fortuna Gold Bar"
+                                            value={name}
+                                            onChange={(e) => setName(e.target.value)}
+                                            className="form-input"
+                                        />
                                     </div>
                                     <div>
                                         <label className="form-label">Description</label>
-                                        <textarea rows={6} className="form-input" placeholder="Enter full product details and history..." />
+                                        <textarea
+                                            rows={6}
+                                            className="form-input"
+                                            placeholder="Enter full product details and history..."
+                                            value={description}
+                                            onChange={(e) => setDescription(e.target.value)}
+                                        />
                                     </div>
                                 </div>
                             </div>
@@ -80,32 +167,61 @@ export default function CreateProductPage() {
                                 <div className="grid grid-cols-2 md:grid-cols-3 gap-8">
                                     <div>
                                         <label className="form-label">Metal Type</label>
-                                        <select className="form-input">
-                                            <option>Gold</option>
-                                            <option>Silver</option>
-                                            <option>Platinum</option>
-                                            <option>Palladium</option>
+                                        <select className="form-input" value={metal} onChange={(e) => setMetal(e.target.value)}>
+                                            <option value="gold">Gold</option>
+                                            <option value="silver">Silver</option>
+                                            <option value="platinum">Platinum</option>
+                                            <option value="palladium">Palladium</option>
                                         </select>
                                     </div>
                                     <div>
-                                        <label className="form-label">Weight</label>
-                                        <input type="text" placeholder="e.g. 1 Troy Ounce" className="form-input" />
+                                        <label className="form-label">Weight (Troy oz)</label>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            placeholder="e.g. 1"
+                                            value={weight}
+                                            onChange={(e) => setWeight(e.target.value)}
+                                            className="form-input"
+                                        />
                                     </div>
                                     <div>
                                         <label className="form-label">Purity</label>
-                                        <input type="text" placeholder="e.g. 0.9999 Fine" className="form-input" />
+                                        <input
+                                            type="text"
+                                            placeholder="e.g. 0.9999"
+                                            value={purity}
+                                            onChange={(e) => setPurity(e.target.value)}
+                                            className="form-input"
+                                        />
                                     </div>
                                     <div>
                                         <label className="form-label">Mint</label>
-                                        <input type="text" placeholder="e.g. PAMP Suisse" className="form-input" />
+                                        <input
+                                            type="text"
+                                            placeholder="e.g. PAMP Suisse"
+                                            value={mint}
+                                            onChange={(e) => setMint(e.target.value)}
+                                            className="form-input"
+                                        />
                                     </div>
                                     <div>
-                                        <label className="form-label">Product Type</label>
-                                        <input type="text" placeholder="e.g. Minted Bar" className="form-input" />
+                                        <label className="form-label">Category</label>
+                                        <select className="form-input" value={category} onChange={(e) => setCategory(e.target.value)}>
+                                            <option value="bar">Bar</option>
+                                            <option value="coin">Coin</option>
+                                            <option value="round">Round</option>
+                                        </select>
                                     </div>
                                     <div>
-                                        <label className="form-label">Series</label>
-                                        <input type="text" placeholder="e.g. Lady Fortuna" className="form-input" />
+                                        <label className="form-label">Year</label>
+                                        <input
+                                            type="number"
+                                            placeholder="e.g. 2026"
+                                            value={year}
+                                            onChange={(e) => setYear(e.target.value)}
+                                            className="form-input"
+                                        />
                                     </div>
                                 </div>
                             </div>
@@ -118,20 +234,17 @@ export default function CreateProductPage() {
                                 <h3 className="text-[11px] font-black uppercase tracking-widest mb-6">Store Visibility</h3>
                                 <div className="space-y-4">
                                     <label className="flex items-center gap-4 p-4 border border-gray-100 bg-gray-50 rounded-sm cursor-pointer hover:border-black transition-all">
-                                        <input type="checkbox" className="luxey-checkbox" />
+                                        <input
+                                            type="checkbox"
+                                            className="luxey-checkbox"
+                                            checked={isActive}
+                                            onChange={(e) => setIsActive(e.target.checked)}
+                                        />
                                         <div>
-                                            <p className="text-[11px] font-black uppercase">Featured Product</p>
-                                            <p className="text-[9px] text-gray-400 font-bold uppercase tracking-tighter">Display in Home Scroller</p>
+                                            <p className="text-[11px] font-black uppercase">Active / Visible</p>
+                                            <p className="text-[9px] text-gray-400 font-bold uppercase tracking-tighter">Display to customers</p>
                                         </div>
                                     </label>
-                                    <div className="p-4 border border-gray-100 rounded-sm">
-                                        <label className="form-label">Assign Category</label>
-                                        <select className="form-input text-xs font-bold uppercase">
-                                            <option>Gold Bars</option>
-                                            <option>Gold Coins</option>
-                                            <option>Silver Bullion</option>
-                                        </select>
-                                    </div>
                                 </div>
                             </div>
 
@@ -183,9 +296,11 @@ export default function CreateProductPage() {
                                         ))}
                                     </div>
 
-                                    <p className="text-[9px] text-gray-400 uppercase font-black text-center mt-4">
-                                        Click an image to set as default
-                                    </p>
+                                    {images.length > 0 && (
+                                        <p className="text-[9px] text-gray-400 uppercase font-black text-center mt-4">
+                                            Click an image to set as default
+                                        </p>
+                                    )}
                                 </div>
                             </div>
                         </div>

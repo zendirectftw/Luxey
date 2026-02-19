@@ -1,36 +1,103 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
 
-/* ── Default tier configuration (7 levels) ────────────────── */
-const defaultTiers = [
-    { id: 1, name: "Bronze", volumeReq: 25000, platformFee: 0.75, eligibleLevel: 1, commissionPct: 15, color: "#CD7F32" },
-    { id: 2, name: "Silver", volumeReq: 75000, platformFee: 0.70, eligibleLevel: 2, commissionPct: 10, color: "#C0C0C0" },
-    { id: 3, name: "Gold", volumeReq: 150000, platformFee: 0.60, eligibleLevel: 3, commissionPct: 5, color: "#D4AF37" },
-    { id: 4, name: "Platinum", volumeReq: 300000, platformFee: 0.55, eligibleLevel: 4, commissionPct: 3, color: "#A0B2C6" },
-    { id: 5, name: "Titanium", volumeReq: 500000, platformFee: 0.50, eligibleLevel: 5, commissionPct: 2, color: "#878787" },
-    { id: 6, name: "Diamond", volumeReq: 750000, platformFee: 0.45, eligibleLevel: 6, commissionPct: 1.5, color: "#B9F2FF" },
-    { id: 7, name: "Obsidian", volumeReq: 1000000, platformFee: 0.40, eligibleLevel: 7, commissionPct: 1, color: "#2D2D2D" },
-];
+/* ── Types for DB data ────────────────── */
+interface TierConfig {
+    id: string;
+    name: string;
+    volume_requirement: number;
+    platform_fee_pct: number;
+    eligible_level: number;
+    color: string;
+    visibility: string;
+    sort_order: number;
+}
 
-/* ── Default referral commission rates by level ──────────── */
-const defaultCommissions = [
-    { level: 1, label: "Direct Referrals", pct: 15 },
-    { level: 2, label: "2nd Level Referrals", pct: 10 },
-    { level: 3, label: "3rd Level Referrals", pct: 5 },
-    { level: 4, label: "4th Level Referrals", pct: 3 },
-    { level: 5, label: "5th Level Referrals", pct: 2 },
-    { level: 6, label: "6th Level Referrals", pct: 1.5 },
-    { level: 7, label: "7th Level Referrals", pct: 1 },
-];
+interface CommissionRate {
+    id: string;
+    level: number;
+    label: string;
+    commission_rate: number;
+    is_active: boolean;
+}
+
+/* ── Map DB row → UI shape ────────────────── */
+function mapTier(t: TierConfig) {
+    return {
+        id: t.id,
+        sortOrder: t.sort_order,
+        name: t.name,
+        volumeReq: Number(t.volume_requirement),
+        platformFee: Number(t.platform_fee_pct),
+        eligibleLevel: t.eligible_level,
+        commissionPct: 0,
+        color: t.color,
+        visibility: t.visibility,
+    };
+}
+
+function mapCommission(c: CommissionRate) {
+    return {
+        id: c.id,
+        level: c.level,
+        label: c.label,
+        pct: Number(c.commission_rate),
+        isActive: c.is_active,
+    };
+}
 
 export default function AdminStatusPage() {
-    const [tiers, setTiers] = useState(defaultTiers);
-    const [commissions, setCommissions] = useState(defaultCommissions);
-    const [editingTier, setEditingTier] = useState<number | null>(null);
+    const [tiers, setTiers] = useState<ReturnType<typeof mapTier>[]>([]);
+    const [commissions, setCommissions] = useState<ReturnType<typeof mapCommission>[]>([]);
+    const [editingTier, setEditingTier] = useState<string | null>(null);
     const [saved, setSaved] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
-    const updateTier = (id: number, field: string, value: string | number) => {
+    /* ── Load data from Supabase on mount ────────────────── */
+    useEffect(() => {
+        async function loadData() {
+            setLoading(true);
+            setError(null);
+
+            const [tierRes, commRes] = await Promise.all([
+                supabase.from("tier_config").select("*").order("sort_order"),
+                supabase.from("commission_rates").select("*").order("level"),
+            ]);
+
+            if (tierRes.error) {
+                setError(`Failed to load tiers: ${tierRes.error.message}`);
+                setLoading(false);
+                return;
+            }
+            if (commRes.error) {
+                setError(`Failed to load commissions: ${commRes.error.message}`);
+                setLoading(false);
+                return;
+            }
+
+            const mappedTiers = (tierRes.data as TierConfig[]).map(mapTier);
+            const mappedComms = (commRes.data as CommissionRate[]).map(mapCommission);
+
+            // Attach the commission pct to each tier based on eligible level
+            mappedTiers.forEach(t => {
+                const comm = mappedComms.find(c => c.level === t.eligibleLevel);
+                t.commissionPct = comm?.pct || 0;
+            });
+
+            setTiers(mappedTiers);
+            setCommissions(mappedComms);
+            setLoading(false);
+        }
+
+        loadData();
+    }, []);
+
+    /* ── Update handlers ────────────────── */
+    const updateTier = (id: string, field: string, value: string | number) => {
         setTiers(prev => prev.map(t => t.id === id ? { ...t, [field]: value } : t));
         setSaved(false);
     };
@@ -40,12 +107,69 @@ export default function AdminStatusPage() {
         setSaved(false);
     };
 
-    const handleSave = () => {
-        setSaved(true);
-        setTimeout(() => setSaved(false), 3000);
+    /* ── Save to Supabase ────────────────── */
+    const handleSave = async () => {
+        setSaving(true);
+        setError(null);
+
+        try {
+            // Save tiers
+            for (const tier of tiers) {
+                const { error: tierErr } = await supabase
+                    .from("tier_config")
+                    .update({
+                        name: tier.name,
+                        volume_requirement: tier.volumeReq,
+                        platform_fee_pct: tier.platformFee,
+                        eligible_level: tier.eligibleLevel,
+                        color: tier.color,
+                    })
+                    .eq("id", tier.id);
+
+                if (tierErr) throw tierErr;
+            }
+
+            // Save commission rates
+            for (const comm of commissions) {
+                const { error: commErr } = await supabase
+                    .from("commission_rates")
+                    .update({
+                        commission_rate: comm.pct,
+                        label: comm.label,
+                    })
+                    .eq("id", comm.id);
+
+                if (commErr) throw commErr;
+            }
+
+            setSaved(true);
+            setTimeout(() => setSaved(false), 3000);
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : "Failed to save";
+            setError(message);
+        } finally {
+            setSaving(false);
+        }
     };
 
     const totalMaxCommission = commissions.reduce((sum, c) => sum + c.pct, 0);
+
+    /* ── Loading state ────────────────── */
+    if (loading) {
+        return (
+            <>
+                <header className="h-20 bg-white border-b border-[#E4E4E4] flex items-center px-10 shrink-0">
+                    <h2 className="text-xs font-black uppercase tracking-[0.2em]">Status & Commissions</h2>
+                </header>
+                <div className="flex-1 flex items-center justify-center bg-[#FAFAFA]">
+                    <div className="text-center">
+                        <div className="w-8 h-8 border-2 border-black border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                        <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Loading configuration...</p>
+                    </div>
+                </div>
+            </>
+        );
+    }
 
     return (
         <>
@@ -56,6 +180,11 @@ export default function AdminStatusPage() {
                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Tier Configuration</span>
                 </div>
                 <div className="flex items-center gap-3">
+                    {error && (
+                        <span className="text-[10px] font-black text-red-600 uppercase tracking-widest">
+                            ✕ {error}
+                        </span>
+                    )}
                     {saved && (
                         <span className="text-[10px] font-black text-green-600 uppercase tracking-widest animate-pulse">
                             ✓ Saved Successfully
@@ -63,9 +192,13 @@ export default function AdminStatusPage() {
                     )}
                     <button
                         onClick={handleSave}
-                        className="px-6 py-2 text-[10px] font-black uppercase bg-black text-white hover:bg-zinc-800 transition-all tracking-widest"
+                        disabled={saving}
+                        className={`px-6 py-2 text-[10px] font-black uppercase tracking-widest transition-all ${saving
+                                ? "bg-gray-400 text-white cursor-not-allowed"
+                                : "bg-black text-white hover:bg-zinc-800"
+                            }`}
                     >
-                        Save Configuration
+                        {saving ? "Saving..." : "Save Configuration"}
                     </button>
                 </div>
             </header>
@@ -90,8 +223,8 @@ export default function AdminStatusPage() {
                     </div>
                     <div className="admin-stat">
                         <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-3">Min Platform Fee</p>
-                        <p className="text-4xl font-black tracking-tighter mb-1">{Math.min(...tiers.map(t => t.platformFee))}%</p>
-                        <p className="text-[10px] font-bold text-gray-400">{tiers[tiers.length - 1].name} tier rate</p>
+                        <p className="text-4xl font-black tracking-tighter mb-1">{tiers.length > 0 ? Math.min(...tiers.map(t => t.platformFee)) : 0}%</p>
+                        <p className="text-[10px] font-bold text-gray-400">{tiers.length > 0 ? tiers[tiers.length - 1].name : ""} tier rate</p>
                     </div>
                 </div>
 
@@ -130,7 +263,7 @@ export default function AdminStatusPage() {
                                             className="w-8 h-8 rounded-full mx-auto flex items-center justify-center text-[10px] font-black text-white"
                                             style={{ backgroundColor: tier.color }}
                                         >
-                                            {tier.id}
+                                            {tier.sortOrder}
                                         </div>
                                     </td>
                                     <td className="px-6 py-4">
@@ -145,6 +278,9 @@ export default function AdminStatusPage() {
                                             <div className="flex items-center gap-3">
                                                 <span className="text-sm font-bold uppercase tracking-tight">{tier.name}</span>
                                                 <div className="w-3 h-3 rounded-full" style={{ backgroundColor: tier.color }} />
+                                                {tier.visibility === "hidden" && (
+                                                    <span className="text-[8px] font-black uppercase tracking-widest text-orange-500 bg-orange-50 px-2 py-0.5 rounded">Hidden</span>
+                                                )}
                                             </div>
                                         )}
                                     </td>
@@ -216,8 +352,8 @@ export default function AdminStatusPage() {
                                         <button
                                             onClick={() => setEditingTier(editingTier === tier.id ? null : tier.id)}
                                             className={`px-4 py-1.5 text-[9px] font-black uppercase tracking-widest border rounded-sm transition-all ${editingTier === tier.id
-                                                    ? "bg-black text-white border-black"
-                                                    : "border-[#E4E4E4] hover:border-black hover:bg-black hover:text-white"
+                                                ? "bg-black text-white border-black"
+                                                : "border-[#E4E4E4] hover:border-black hover:bg-black hover:text-white"
                                                 }`}
                                         >
                                             {editingTier === tier.id ? "Done" : "Edit"}
@@ -248,12 +384,17 @@ export default function AdminStatusPage() {
                             {commissions.map((c) => (
                                 <div
                                     key={c.level}
-                                    className="border border-[#E4E4E4] rounded-sm p-5 text-center hover:border-black transition-all group"
+                                    className={`border rounded-sm p-5 text-center hover:border-black transition-all group ${!c.isActive ? "border-orange-200 bg-orange-50/30" : "border-[#E4E4E4]"
+                                        }`}
                                 >
-                                    <div className="w-10 h-10 mx-auto rounded-full bg-black text-white text-sm font-black flex items-center justify-center mb-3">
+                                    <div className={`w-10 h-10 mx-auto rounded-full text-white text-sm font-black flex items-center justify-center mb-3 ${!c.isActive ? "bg-gray-400" : "bg-black"
+                                        }`}>
                                         {c.level}
                                     </div>
-                                    <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-3">{c.label}</p>
+                                    <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1">{c.label}</p>
+                                    {!c.isActive && (
+                                        <p className="text-[7px] font-black uppercase tracking-widest text-orange-500 mb-2">Hidden Level</p>
+                                    )}
                                     <div className="relative">
                                         <input
                                             type="number"
@@ -276,14 +417,15 @@ export default function AdminStatusPage() {
                             <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-4">Commission Distribution</p>
                             <div className="flex items-center gap-1 h-10 rounded-sm overflow-hidden">
                                 {commissions.map((c) => {
-                                    const width = (c.pct / totalMaxCommission) * 100;
+                                    const width = totalMaxCommission > 0 ? (c.pct / totalMaxCommission) * 100 : 0;
                                     const colors = ["bg-green-500", "bg-blue-500", "bg-yellow-500", "bg-orange-500", "bg-red-500", "bg-purple-500", "bg-pink-500"];
                                     return (
                                         <div
                                             key={c.level}
-                                            className={`${colors[c.level - 1]} h-full flex items-center justify-center text-white text-[9px] font-black transition-all`}
+                                            className={`${colors[c.level - 1]} h-full flex items-center justify-center text-white text-[9px] font-black transition-all ${!c.isActive ? "opacity-50" : ""
+                                                }`}
                                             style={{ width: `${width}%` }}
-                                            title={`Level ${c.level}: ${c.pct}%`}
+                                            title={`Level ${c.level}: ${c.pct}%${!c.isActive ? " (Hidden)" : ""}`}
                                         >
                                             {c.pct > 2 ? `L${c.level}: ${c.pct}%` : ""}
                                         </div>
@@ -323,11 +465,14 @@ export default function AdminStatusPage() {
                                     .filter(c => c.level <= tier.eligibleLevel)
                                     .reduce((sum, c) => sum + c.pct, 0);
                                 return (
-                                    <tr key={tier.id} className="hover:bg-[#FAFAFA] transition-colors">
+                                    <tr key={tier.id} className={`hover:bg-[#FAFAFA] transition-colors ${tier.visibility === "hidden" ? "opacity-50" : ""}`}>
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">
                                                 <div className="w-3 h-3 rounded-full" style={{ backgroundColor: tier.color }} />
                                                 <span className="text-sm font-bold uppercase tracking-tight">{tier.name}</span>
+                                                {tier.visibility === "hidden" && (
+                                                    <span className="text-[8px] font-black uppercase tracking-widest text-orange-500">🔒</span>
+                                                )}
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 text-right text-sm font-bold">${tier.volumeReq.toLocaleString()}</td>

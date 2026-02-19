@@ -1,51 +1,154 @@
-export const metadata = { title: "Dashboard | Luxey© MyAccount" };
+"use client";
 
-const lockerStats = [
-    { label: "Total Items", value: "142" },
-    { label: "Total Trays", value: "06" },
-    { label: "Locker Total Value ($)", value: "$342,850", green: true },
-    { label: "Total Change in Value ($)", value: "+$12,400", green: true, growth: "(+3.8%)", border: true },
-];
+import { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
+import { DEMO_USER_ID } from "@/lib/constants";
 
-const activityLeft = [
-    { period: "This Month", value: "04", growth: "(+12%)", up: true },
-    { period: "Past 3 Months", value: "12", growth: "(+2%)", up: true },
-    { period: "Past 6 Months", value: "24", growth: "(+8%)", up: true },
-    { period: "Past 12 Months", value: "56", growth: "(+22%)", up: true, bg: true },
-];
+interface UserData {
+    full_name: string;
+    tier: string;
+    created_at: string;
+}
 
-const activityRight = [
-    { period: "This Month", value: "$12,450", growth: "(+5.4%)", up: true },
-    { period: "Past 3 Months", value: "$48,210", growth: "(-1.2%)", up: false },
-    { period: "Past 6 Months", value: "$92,000", growth: "(+14.1%)", up: true },
-    { period: "Past 12 Months", value: "$215,700", growth: "(+9.2%)", up: true, bg: true },
-];
-
-const earnings = [
-    { label: "Number of Referrals", value: "18", growth: "(+2)", up: true, large: true },
-    { label: "Commission This Month", value: "$1,240", growth: "(+18%)", up: true, green: true },
-    { label: "Commission Last Month", value: "$850", growth: "(-4%)", up: false },
-    { label: "Lifetime Commissions", value: "$148,200", growth: "(+100%)", featured: true },
-];
+interface Stats {
+    totalItems: number;
+    totalValue: number;
+    referralCount: number;
+    lifetimeCommissions: number;
+    commissionThisMonth: number;
+    commissionLastMonth: number;
+    ordersThisMonth: number;
+    orders3Months: number;
+    orders6Months: number;
+    orders12Months: number;
+    valueThisMonth: number;
+    value3Months: number;
+    value6Months: number;
+    value12Months: number;
+}
 
 export default function DashboardPage() {
+    const [user, setUser] = useState<UserData | null>(null);
+    const [stats, setStats] = useState<Stats | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        async function load() {
+            const now = new Date();
+            const startThisMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+            const startLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
+            const endLastMonth = startThisMonth;
+            const start3 = new Date(now.getFullYear(), now.getMonth() - 3, 1).toISOString();
+            const start6 = new Date(now.getFullYear(), now.getMonth() - 6, 1).toISOString();
+            const start12 = new Date(now.getFullYear(), now.getMonth() - 12, 1).toISOString();
+
+            const [userRes, posRes, refRes, commRes, commThisRes, commLastRes] = await Promise.all([
+                supabase.from("users").select("full_name, tier, created_at").eq("id", DEMO_USER_ID).single(),
+                supabase.from("purchase_orders").select("seller_lock_price, created_at").eq("seller_id", DEMO_USER_ID),
+                supabase.from("users").select("id").eq("referred_by", DEMO_USER_ID),
+                supabase.from("commissions").select("amount").eq("beneficiary_id", DEMO_USER_ID),
+                supabase.from("commissions").select("amount").eq("beneficiary_id", DEMO_USER_ID).gte("created_at", startThisMonth),
+                supabase.from("commissions").select("amount").eq("beneficiary_id", DEMO_USER_ID).gte("created_at", startLastMonth).lt("created_at", endLastMonth),
+            ]);
+
+            setUser(userRes.data);
+
+            const pos = posRes.data || [];
+            const totalItems = pos.length;
+            const totalValue = pos.reduce((s, p) => s + Number(p.seller_lock_price || 0), 0);
+
+            const count = (arr: typeof pos, since: string) => arr.filter(p => p.created_at >= since).length;
+            const sum = (arr: typeof pos, since: string) => arr.filter(p => p.created_at >= since).reduce((s, p) => s + Number(p.seller_lock_price || 0), 0);
+
+            const lifetimeCommissions = (commRes.data || []).reduce((s, c) => s + Number(c.amount || 0), 0);
+            const commissionThisMonth = (commThisRes.data || []).reduce((s, c) => s + Number(c.amount || 0), 0);
+            const commissionLastMonth = (commLastRes.data || []).reduce((s, c) => s + Number(c.amount || 0), 0);
+
+            setStats({
+                totalItems,
+                totalValue,
+                referralCount: (refRes.data || []).length,
+                lifetimeCommissions,
+                commissionThisMonth,
+                commissionLastMonth,
+                ordersThisMonth: count(pos, startThisMonth),
+                orders3Months: count(pos, start3),
+                orders6Months: count(pos, start6),
+                orders12Months: count(pos, start12),
+                valueThisMonth: sum(pos, startThisMonth),
+                value3Months: sum(pos, start3),
+                value6Months: sum(pos, start6),
+                value12Months: sum(pos, start12),
+            });
+            setLoading(false);
+        }
+        load();
+    }, []);
+
+    const fmt = (n: number) => "$" + n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    const tierLabel = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
+
+    if (loading) {
+        return (
+            <div className="max-w-7xl mx-auto w-full py-8 px-6">
+                <div className="flex items-center justify-center min-h-[400px]">
+                    <div className="text-center">
+                        <div className="w-8 h-8 border-2 border-black border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                        <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Loading dashboard...</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    const lockerStats = [
+        { label: "Total Items", value: String(stats?.totalItems || 0).padStart(2, "0") },
+        { label: "Total Trays", value: String(Math.ceil((stats?.totalItems || 0) / 25)).padStart(2, "0") },
+        { label: "Locker Total Value ($)", value: fmt(stats?.totalValue || 0), green: true },
+        { label: "Total Change in Value ($)", value: "+$0", green: true, growth: "(—)", border: true },
+    ];
+
+    const activityLeft = [
+        { period: "This Month", value: String(stats?.ordersThisMonth || 0).padStart(2, "0") },
+        { period: "Past 3 Months", value: String(stats?.orders3Months || 0).padStart(2, "0") },
+        { period: "Past 6 Months", value: String(stats?.orders6Months || 0).padStart(2, "0") },
+        { period: "Past 12 Months", value: String(stats?.orders12Months || 0).padStart(2, "0"), bg: true },
+    ];
+
+    const activityRight = [
+        { period: "This Month", value: fmt(stats?.valueThisMonth || 0) },
+        { period: "Past 3 Months", value: fmt(stats?.value3Months || 0) },
+        { period: "Past 6 Months", value: fmt(stats?.value6Months || 0) },
+        { period: "Past 12 Months", value: fmt(stats?.value12Months || 0), bg: true },
+    ];
+
+    const earnings = [
+        { label: "Number of Referrals", value: String(stats?.referralCount || 0), large: true },
+        { label: "Commission This Month", value: fmt(stats?.commissionThisMonth || 0), green: true },
+        { label: "Commission Last Month", value: fmt(stats?.commissionLastMonth || 0) },
+        { label: "Lifetime Commissions", value: fmt(stats?.lifetimeCommissions || 0), featured: true },
+    ];
+
+    const firstName = user?.full_name?.split(" ")[0] || "User";
+    const memberSince = user?.created_at ? new Date(user.created_at).toLocaleDateString("en-US", { month: "long", year: "numeric" }) : "";
+
     return (
         <div className="max-w-7xl mx-auto w-full py-8 px-6">
             {/* HEADER */}
             <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                 <div>
                     <h1 className="font-serif text-5xl text-black tracking-tight mb-1 uppercase">
-                        Jerrold&apos;s Dashboard
+                        {firstName}&apos;s Dashboard
                     </h1>
                     <p className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.2em]">
-                        Member since — September 2023
+                        Member since — {memberSince}
                     </p>
                 </div>
                 <div className="flex items-center gap-3 bg-white border border-[#E4E4E4] p-4 rounded-sm shadow-sm">
                     <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">
                         Current Status:
                     </span>
-                    <span className="status-pill-gold">GOLD TIER</span>
+                    <span className="status-pill-gold">{tierLabel(user?.tier || "bronze")} TIER</span>
                 </div>
             </header>
 
@@ -77,40 +180,15 @@ export default function DashboardPage() {
             </div>
 
             {/* ACTIVITY GRID */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2 mb-12">
-                <div className="text-[10px] font-black uppercase tracking-[0.15em] text-gray-600 py-3 border-b-2 border-black mb-1 ml-1">
-                    TOTAL ORDERS AND LOCKS (% change)
-                </div>
-                <div className="text-[10px] font-black uppercase tracking-[0.15em] text-gray-600 py-3 border-b-2 border-black mb-1 ml-1">
-                    ORDERS AND LOCKS - TOTAL $ MARKET VALUE (% change)
-                </div>
-
-                {activityLeft.map((item, i) => (
-                    <div
-                        key={`left-${item.period}`}
-                        className={`stat-card flex justify-between items-center ${item.bg ? "bg-zinc-50" : ""}`}
-                    >
-                        <span className="text-[11px] font-black text-black uppercase tracking-widest">
-                            {item.period}
-                        </span>
-                        <div className="flex items-center">
-                            <span className="text-2xl font-black tracking-tighter">{item.value}</span>
-                            <span className={item.up ? "growth-up" : "growth-down"}>{item.growth}</span>
-                        </div>
-                    </div>
-                ))}
-
-                {/* Re-render right column — interleaved grid handles this via CSS grid order */}
-            </div>
-
-            {/* Rebuild activity grid properly with interleaved layout */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2 mb-12 -mt-12 hidden md:grid">
-                {/* This section intentionally left for the proper interleaved grid above */}
-            </div>
-
-            {/* Actually, let's do side-by-side rows properly */}
-            <div className="-mt-12 mb-12">
+            <div className="mb-12">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2">
+                    <div className="text-[10px] font-black uppercase tracking-[0.15em] text-gray-600 py-3 border-b-2 border-black mb-1 ml-1">
+                        TOTAL ORDERS AND LOCKS
+                    </div>
+                    <div className="text-[10px] font-black uppercase tracking-[0.15em] text-gray-600 py-3 border-b-2 border-black mb-1 ml-1">
+                        ORDERS AND LOCKS - TOTAL $ MARKET VALUE
+                    </div>
+
                     {activityLeft.map((left, i) => {
                         const right = activityRight[i];
                         return (
@@ -119,19 +197,13 @@ export default function DashboardPage() {
                                     <span className="text-[11px] font-black text-black uppercase tracking-widest">
                                         {left.period}
                                     </span>
-                                    <div className="flex items-center">
-                                        <span className="text-2xl font-black tracking-tighter">{left.value}</span>
-                                        <span className={left.up ? "growth-up" : "growth-down"}>{left.growth}</span>
-                                    </div>
+                                    <span className="text-2xl font-black tracking-tighter">{left.value}</span>
                                 </div>
                                 <div className={`stat-card flex justify-between items-center border-l-4 border-l-green-500 ${right.bg ? "bg-zinc-50" : ""}`}>
                                     <span className="text-[11px] font-black text-black uppercase tracking-widest">
                                         {right.period}
                                     </span>
-                                    <div className="flex items-center">
-                                        <span className="text-2xl font-black price-green tracking-tighter">{right.value}</span>
-                                        <span className={right.up ? "growth-up" : "growth-down"}>{right.growth}</span>
-                                    </div>
+                                    <span className="text-2xl font-black price-green tracking-tighter">{right.value}</span>
                                 </div>
                             </div>
                         );
@@ -163,25 +235,14 @@ export default function DashboardPage() {
                             <div className="flex items-baseline">
                                 <p
                                     className={`${item.large ? "text-4xl" : "text-3xl"} font-black tracking-tighter ${item.featured
-                                            ? "text-[#D4AF37]"
-                                            : item.green
-                                                ? "price-green"
-                                                : "text-black"
+                                        ? "text-[#D4AF37]"
+                                        : item.green
+                                            ? "price-green"
+                                            : "text-black"
                                         }`}
                                 >
                                     {item.value}
                                 </p>
-                                <span
-                                    className={
-                                        item.featured
-                                            ? "text-[#D4AF37] text-[10px] font-bold ml-2 opacity-80"
-                                            : item.up
-                                                ? "growth-up text-xs"
-                                                : "growth-down"
-                                    }
-                                >
-                                    {item.growth}
-                                </span>
                             </div>
                         </div>
                     ))}

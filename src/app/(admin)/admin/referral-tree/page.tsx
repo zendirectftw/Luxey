@@ -1,43 +1,31 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
 
-/* ── Sample referral tree data ────────────────── */
-const referralTree = {
-    id: "CUS-10042",
-    name: "David Kim",
-    email: "david@email.com",
-    tier: "Bronze",
-    joined: "01/15/2026",
-    level: 0,
-    upline: [
-        { level: 1, id: "CUS-10008", name: "Marcus Lee", email: "marcus@email.com", tier: "Silver", joined: "10/2024" },
-        { level: 2, id: "CUS-10003", name: "Sarah Connor", email: "sarah@email.com", tier: "Gold", joined: "08/2024" },
-        { level: 3, id: "CUS-10001", name: "Jerrold Gardner", email: "jg@luxey.com", tier: "Gold", joined: "06/2024" },
-        { level: 4, id: "CUS-10000", name: "Michael Thorne", email: "mt@email.com", tier: "Silver", joined: "03/2024" },
-        { level: 5, id: "CUS-09982", name: "Ana Torres", email: "ana@email.com", tier: "Bronze", joined: "01/2024" },
-        { level: 6, id: "CUS-09940", name: "Rita Walsh", email: "rita@email.com", tier: "Bronze", joined: "11/2023" },
-        { level: 7, id: "CUS-09901", name: "Frank Vega", email: "frank@email.com", tier: "Silver", joined: "08/2023" },
-    ],
-};
+interface User {
+    id: string;
+    full_name: string;
+    email: string;
+    tier: string;
+    referral_code: string;
+    created_at: string;
+}
 
-/* ── All customers for lookup ────────────────── */
-const allCustomers = [
-    { id: "CUS-10042", name: "David Kim", email: "david@email.com", referredBy: "CUS-10008", treeDepth: 7, joined: "01/2026" },
-    { id: "CUS-10040", name: "Lisa Chen", email: "lisa@email.com", referredBy: "CUS-10003", treeDepth: 6, joined: "01/2026" },
-    { id: "CUS-10038", name: "James Park", email: "james@email.com", referredBy: "CUS-10001", treeDepth: 5, joined: "01/2026" },
-    { id: "CUS-10035", name: "Olivia Grant", email: "olivia@email.com", referredBy: "CUS-10008", treeDepth: 7, joined: "12/2025" },
-    { id: "CUS-10030", name: "Noah Williams", email: "noah@email.com", referredBy: "CUS-10003", treeDepth: 6, joined: "12/2025" },
-    { id: "CUS-10025", name: "Emma Davis", email: "emma@email.com", referredBy: "CUS-10001", treeDepth: 4, joined: "11/2025" },
-    { id: "CUS-10020", name: "Liam Brown", email: "liam@email.com", referredBy: "CUS-10000", treeDepth: 3, joined: "10/2025" },
-    { id: "CUS-10008", name: "Marcus Lee", email: "marcus@email.com", referredBy: "CUS-10003", treeDepth: 6, joined: "10/2024" },
-];
+interface UplineEntry {
+    level: number;
+    ancestor: User;
+}
 
 const tierColor = (tier: string) => {
     switch (tier) {
-        case "Gold": return "bg-yellow-50 text-yellow-700";
-        case "Silver": return "bg-gray-100 text-gray-600";
-        case "Bronze": return "bg-orange-50 text-orange-700";
+        case "obsidian": return "bg-zinc-900 text-white";
+        case "diamond": return "bg-cyan-50 text-cyan-700";
+        case "titanium": return "bg-zinc-200 text-zinc-700";
+        case "platinum": return "bg-blue-50 text-blue-600";
+        case "gold": return "bg-yellow-50 text-yellow-700";
+        case "silver": return "bg-gray-100 text-gray-600";
+        case "bronze": return "bg-orange-50 text-orange-700";
         default: return "bg-gray-50 text-gray-400";
     }
 };
@@ -51,20 +39,95 @@ const levelColor = (level: number) => {
         "border-l-red-500 bg-red-50/30",
         "border-l-purple-500 bg-purple-50/30",
         "border-l-pink-500 bg-pink-50/30",
-        "border-l-cyan-500 bg-cyan-50/30",
     ];
-    return colors[level] || colors[0];
+    return colors[level - 1] || colors[0];
 };
 
 export default function ReferralTreePage() {
-    const [selectedCustomer, setSelectedCustomer] = useState(referralTree);
+    const [users, setUsers] = useState<User[]>([]);
+    const [selectedUser, setSelectedUser] = useState<User | null>(null);
+    const [upline, setUpline] = useState<UplineEntry[]>([]);
     const [searchQuery, setSearchQuery] = useState("");
+    const [loading, setLoading] = useState(true);
+    const [treeLoading, setTreeLoading] = useState(false);
 
-    const filteredCustomers = allCustomers.filter(
-        c => c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            c.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            c.email.toLowerCase().includes(searchQuery.toLowerCase())
+    useEffect(() => {
+        async function load() {
+            const { data } = await supabase
+                .from("users")
+                .select("id, full_name, email, tier, referral_code, created_at")
+                .neq("referral_code", "LUXEY-HOUSE")
+                .order("full_name");
+
+            if (data) {
+                setUsers(data);
+                if (data.length > 0) {
+                    setSelectedUser(data[0]);
+                    loadUpline(data[0].id);
+                }
+            }
+            setLoading(false);
+        }
+        load();
+    }, []);
+
+    async function loadUpline(userId: string) {
+        setTreeLoading(true);
+        const { data: treeData } = await supabase
+            .from("referral_tree")
+            .select("level, ancestor_id")
+            .eq("user_id", userId)
+            .order("level");
+
+        if (treeData && treeData.length > 0) {
+            const ancestorIds = treeData.map(t => t.ancestor_id);
+            const { data: ancestorData } = await supabase
+                .from("users")
+                .select("id, full_name, email, tier, referral_code, created_at")
+                .in("id", ancestorIds);
+
+            const ancestorMap = new Map(ancestorData?.map(u => [u.id, u]) || []);
+
+            const entries: UplineEntry[] = treeData
+                .map(t => ({
+                    level: t.level,
+                    ancestor: ancestorMap.get(t.ancestor_id)!,
+                }))
+                .filter(e => e.ancestor);
+
+            setUpline(entries);
+        } else {
+            setUpline([]);
+        }
+        setTreeLoading(false);
+    }
+
+    const selectUser = (user: User) => {
+        setSelectedUser(user);
+        loadUpline(user.id);
+    };
+
+    const filteredUsers = users.filter(
+        c => c.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            c.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            c.referral_code.toLowerCase().includes(searchQuery.toLowerCase())
     );
+
+    if (loading) {
+        return (
+            <>
+                <header className="h-20 bg-white border-b border-[#E4E4E4] flex items-center px-10 shrink-0">
+                    <h2 className="text-xs font-black uppercase tracking-[0.2em]">Referral Tree</h2>
+                </header>
+                <div className="flex-1 flex items-center justify-center bg-[#FAFAFA]">
+                    <div className="text-center">
+                        <div className="w-8 h-8 border-2 border-black border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                        <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Loading...</p>
+                    </div>
+                </div>
+            </>
+        );
+    }
 
     return (
         <>
@@ -81,7 +144,6 @@ export default function ReferralTreePage() {
 
             <div className="flex-1 overflow-y-auto p-10 bg-[#FAFAFA]">
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-
                     {/* Left: Customer Lookup */}
                     <div className="space-y-6">
                         <div className="bg-white border border-[#E4E4E4] rounded-sm shadow-sm overflow-hidden">
@@ -93,7 +155,7 @@ export default function ReferralTreePage() {
                                     </div>
                                     <input
                                         type="text"
-                                        placeholder="Search by name, ID, email..."
+                                        placeholder="Search by name, email, code..."
                                         className="w-full pl-10 pr-4 py-2.5 bg-white border border-[#E4E4E4] rounded-sm text-xs font-medium outline-none focus:border-black transition-all"
                                         value={searchQuery}
                                         onChange={(e) => setSearchQuery(e.target.value)}
@@ -101,130 +163,159 @@ export default function ReferralTreePage() {
                                 </div>
                             </div>
                             <div className="max-h-[500px] overflow-y-auto divide-y divide-[#F5F5F5]">
-                                {filteredCustomers.map((c) => (
-                                    <button
-                                        key={c.id}
-                                        onClick={() => setSelectedCustomer({ ...referralTree, id: c.id, name: c.name, email: c.email })}
-                                        className={`w-full text-left p-4 hover:bg-[#FAFAFA] transition-colors ${selectedCustomer.id === c.id ? "bg-[#FAFAFA] border-l-4 border-l-[#D4AF37]" : ""}`}
-                                    >
-                                        <div className="flex items-center justify-between mb-1">
-                                            <span className="text-sm font-bold uppercase tracking-tight">{c.name}</span>
-                                            <span className="text-[9px] font-black text-gray-400">{c.id}</span>
-                                        </div>
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-[10px] text-gray-400 font-medium">{c.email}</span>
-                                            <span className="text-[9px] font-bold text-gray-300">{c.treeDepth} levels</span>
-                                        </div>
-                                    </button>
-                                ))}
+                                {filteredUsers.length === 0 ? (
+                                    <div className="p-8 text-center">
+                                        <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">No customers found</p>
+                                    </div>
+                                ) : (
+                                    filteredUsers.map((c) => (
+                                        <button
+                                            key={c.id}
+                                            onClick={() => selectUser(c)}
+                                            className={`w-full text-left p-4 hover:bg-[#FAFAFA] transition-colors ${selectedUser?.id === c.id ? "bg-[#FAFAFA] border-l-4 border-l-[#D4AF37]" : ""}`}
+                                        >
+                                            <div className="flex items-center justify-between mb-1">
+                                                <span className="text-sm font-bold uppercase tracking-tight">{c.full_name}</span>
+                                                <span className={`px-2 py-0.5 text-[8px] font-black uppercase rounded ${tierColor(c.tier)}`}>
+                                                    {c.tier}
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-[10px] text-gray-400 font-medium">{c.email}</span>
+                                                <span className="text-[9px] font-bold text-gray-300">{c.referral_code}</span>
+                                            </div>
+                                        </button>
+                                    ))
+                                )}
                             </div>
                         </div>
                     </div>
 
                     {/* Right: Referral Tree */}
                     <div className="lg:col-span-2 space-y-6">
-                        {/* Selected Customer Card */}
-                        <div className="bg-black text-white p-8 rounded-sm shadow-sm">
-                            <div className="flex items-center justify-between mb-4">
-                                <div>
-                                    <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1">Selected Customer — Level 0</p>
-                                    <h3 className="text-2xl font-black uppercase tracking-tight">{selectedCustomer.name}</h3>
-                                </div>
-                                <div className="text-right">
-                                    <p className="text-[10px] font-bold text-[#D4AF37]">{selectedCustomer.id}</p>
-                                    <p className="text-[10px] text-gray-400">{selectedCustomer.email}</p>
-                                </div>
-                            </div>
-                            <div className="flex gap-6 text-[10px] font-bold uppercase tracking-widest text-gray-400">
-                                <span>Tier: <span className="text-[#D4AF37]">{selectedCustomer.tier}</span></span>
-                                <span>Joined: <span className="text-white">{selectedCustomer.joined}</span></span>
-                                <span>Upline: <span className="text-white">{selectedCustomer.upline.length} levels</span></span>
-                            </div>
-                        </div>
-
-                        {/* Upline Tree */}
-                        <div className="bg-white border border-[#E4E4E4] rounded-sm shadow-sm overflow-hidden">
-                            <div className="p-6 border-b border-[#E4E4E4] bg-[#FAFAFA] flex justify-between items-center">
-                                <h3 className="text-[11px] font-black uppercase tracking-widest">Referral Upline Tree</h3>
-                                <span className="text-[10px] font-bold text-gray-400">Commission eligible levels highlighted</span>
-                            </div>
-
-                            {/* Tree visualization */}
-                            <div className="p-6 space-y-3">
-                                {selectedCustomer.upline.map((person) => (
-                                    <div
-                                        key={person.id}
-                                        className={`border-l-4 rounded-sm p-5 flex items-center justify-between ${levelColor(person.level)}`}
-                                        style={{ marginLeft: `${(person.level - 1) * 12}px` }}
-                                    >
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-10 h-10 rounded-full bg-white border border-[#E4E4E4] flex items-center justify-center text-[10px] font-black text-zinc-400 shrink-0">
-                                                {person.name.split(" ").map(n => n[0]).join("")}
-                                            </div>
-                                            <div>
-                                                <div className="flex items-center gap-3 mb-0.5">
-                                                    <span className="text-sm font-bold uppercase tracking-tight">{person.name}</span>
-                                                    <span className={`px-2 py-0.5 text-[8px] font-black uppercase rounded ${tierColor(person.tier)}`}>
-                                                        {person.tier}
-                                                    </span>
-                                                </div>
-                                                <div className="flex items-center gap-3 text-[10px] text-gray-400 font-medium">
-                                                    <span>{person.email}</span>
-                                                    <span>•</span>
-                                                    <span>{person.id}</span>
-                                                </div>
-                                            </div>
+                        {selectedUser && (
+                            <>
+                                {/* Selected Customer Card */}
+                                <div className="bg-black text-white p-8 rounded-sm shadow-sm">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <div>
+                                            <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1">Selected Customer — Level 0</p>
+                                            <h3 className="text-2xl font-black uppercase tracking-tight">{selectedUser.full_name}</h3>
                                         </div>
-                                        <div className="text-right shrink-0">
-                                            <span className="inline-flex items-center gap-1 px-3 py-1 bg-white border border-[#E4E4E4] rounded text-[10px] font-black uppercase tracking-widest">
-                                                Level {person.level}
-                                            </span>
-                                            <p className="text-[9px] text-gray-400 font-bold mt-1">{person.joined}</p>
+                                        <div className="text-right">
+                                            <p className="text-[10px] font-bold text-[#D4AF37]">{selectedUser.referral_code}</p>
+                                            <p className="text-[10px] text-gray-400">{selectedUser.email}</p>
                                         </div>
                                     </div>
-                                ))}
-                            </div>
-                        </div>
+                                    <div className="flex gap-6 text-[10px] font-bold uppercase tracking-widest text-gray-400">
+                                        <span>Tier: <span className="text-[#D4AF37] capitalize">{selectedUser.tier}</span></span>
+                                        <span>Joined: <span className="text-white">{new Date(selectedUser.created_at).toLocaleDateString("en-US", { month: "2-digit", year: "numeric" })}</span></span>
+                                        <span>Upline: <span className="text-white">{upline.length} levels</span></span>
+                                    </div>
+                                </div>
 
-                        {/* Network Table (flat view) */}
-                        <div className="bg-white border border-[#E4E4E4] rounded-sm shadow-sm overflow-hidden">
-                            <div className="p-6 border-b border-[#E4E4E4] bg-[#FAFAFA] flex justify-between items-center">
-                                <h3 className="text-[11px] font-black uppercase tracking-widest">Upline Data — Exportable</h3>
-                                <span className="text-[10px] font-bold text-gray-400">For commission calculations</span>
-                            </div>
-                            <table className="w-full text-left">
-                                <thead>
-                                    <tr className="border-b border-[#E4E4E4] text-[9px] font-black uppercase tracking-widest text-gray-400">
-                                        <th className="px-6 py-3 text-center">Level</th>
-                                        <th className="px-6 py-3">Customer ID</th>
-                                        <th className="px-6 py-3">Name</th>
-                                        <th className="px-6 py-3">Email</th>
-                                        <th className="px-6 py-3 text-center">Tier</th>
-                                        <th className="px-6 py-3">Joined</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-[#F5F5F5]">
-                                    {selectedCustomer.upline.map((person) => (
-                                        <tr key={person.id} className="hover:bg-[#FAFAFA] transition-colors">
-                                            <td className="px-6 py-3 text-center">
-                                                <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-black text-white text-[10px] font-black">
-                                                    {person.level}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-3 text-xs font-bold">{person.id}</td>
-                                            <td className="px-6 py-3 text-sm font-bold uppercase tracking-tight">{person.name}</td>
-                                            <td className="px-6 py-3 text-xs text-gray-500">{person.email}</td>
-                                            <td className="px-6 py-3 text-center">
-                                                <span className={`px-2 py-1 text-[9px] font-black uppercase rounded ${tierColor(person.tier)}`}>
-                                                    {person.tier}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-3 text-xs font-medium text-gray-400">{person.joined}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
+                                {/* Upline Tree */}
+                                <div className="bg-white border border-[#E4E4E4] rounded-sm shadow-sm overflow-hidden">
+                                    <div className="p-6 border-b border-[#E4E4E4] bg-[#FAFAFA] flex justify-between items-center">
+                                        <h3 className="text-[11px] font-black uppercase tracking-widest">Referral Upline Tree</h3>
+                                        <span className="text-[10px] font-bold text-gray-400">Commission eligible levels highlighted</span>
+                                    </div>
+
+                                    <div className="p-6 space-y-3">
+                                        {treeLoading ? (
+                                            <div className="text-center py-8">
+                                                <div className="w-6 h-6 border-2 border-black border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                                                <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Loading tree...</p>
+                                            </div>
+                                        ) : upline.length === 0 ? (
+                                            <div className="text-center py-8">
+                                                <p className="text-3xl mb-3">🌳</p>
+                                                <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">No upline found — this user was not referred</p>
+                                            </div>
+                                        ) : (
+                                            upline.map((entry) => (
+                                                <div
+                                                    key={entry.ancestor.id}
+                                                    className={`border-l-4 rounded-sm p-5 flex items-center justify-between ${levelColor(entry.level)}`}
+                                                    style={{ marginLeft: `${(entry.level - 1) * 12}px` }}
+                                                >
+                                                    <div className="flex items-center gap-4">
+                                                        <div className="w-10 h-10 rounded-full bg-white border border-[#E4E4E4] flex items-center justify-center text-[10px] font-black text-zinc-400 shrink-0">
+                                                            {entry.ancestor.full_name.split(" ").map(n => n[0]).join("")}
+                                                        </div>
+                                                        <div>
+                                                            <div className="flex items-center gap-3 mb-0.5">
+                                                                <span className="text-sm font-bold uppercase tracking-tight">{entry.ancestor.full_name}</span>
+                                                                <span className={`px-2 py-0.5 text-[8px] font-black uppercase rounded ${tierColor(entry.ancestor.tier)}`}>
+                                                                    {entry.ancestor.tier}
+                                                                </span>
+                                                            </div>
+                                                            <div className="flex items-center gap-3 text-[10px] text-gray-400 font-medium">
+                                                                <span>{entry.ancestor.email}</span>
+                                                                <span>•</span>
+                                                                <span>{entry.ancestor.referral_code}</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-right shrink-0">
+                                                        <span className="inline-flex items-center gap-1 px-3 py-1 bg-white border border-[#E4E4E4] rounded text-[10px] font-black uppercase tracking-widest">
+                                                            Level {entry.level}
+                                                        </span>
+                                                        <p className="text-[9px] text-gray-400 font-bold mt-1">
+                                                            {new Date(entry.ancestor.created_at).toLocaleDateString("en-US", { month: "2-digit", year: "numeric" })}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Upline Data Table */}
+                                {upline.length > 0 && (
+                                    <div className="bg-white border border-[#E4E4E4] rounded-sm shadow-sm overflow-hidden">
+                                        <div className="p-6 border-b border-[#E4E4E4] bg-[#FAFAFA] flex justify-between items-center">
+                                            <h3 className="text-[11px] font-black uppercase tracking-widest">Upline Data — Exportable</h3>
+                                            <span className="text-[10px] font-bold text-gray-400">For commission calculations</span>
+                                        </div>
+                                        <table className="w-full text-left">
+                                            <thead>
+                                                <tr className="border-b border-[#E4E4E4] text-[9px] font-black uppercase tracking-widest text-gray-400">
+                                                    <th className="px-6 py-3 text-center">Level</th>
+                                                    <th className="px-6 py-3">Referral Code</th>
+                                                    <th className="px-6 py-3">Name</th>
+                                                    <th className="px-6 py-3">Email</th>
+                                                    <th className="px-6 py-3 text-center">Tier</th>
+                                                    <th className="px-6 py-3">Joined</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-[#F5F5F5]">
+                                                {upline.map((entry) => (
+                                                    <tr key={entry.ancestor.id} className="hover:bg-[#FAFAFA] transition-colors">
+                                                        <td className="px-6 py-3 text-center">
+                                                            <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-black text-white text-[10px] font-black">
+                                                                {entry.level}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-6 py-3 text-xs font-mono font-bold">{entry.ancestor.referral_code}</td>
+                                                        <td className="px-6 py-3 text-sm font-bold uppercase tracking-tight">{entry.ancestor.full_name}</td>
+                                                        <td className="px-6 py-3 text-xs text-gray-500">{entry.ancestor.email}</td>
+                                                        <td className="px-6 py-3 text-center">
+                                                            <span className={`px-2 py-1 text-[9px] font-black uppercase rounded ${tierColor(entry.ancestor.tier)}`}>
+                                                                {entry.ancestor.tier}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-6 py-3 text-xs font-medium text-gray-400">
+                                                            {new Date(entry.ancestor.created_at).toLocaleDateString("en-US", { month: "2-digit", year: "numeric" })}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </>
+                        )}
                     </div>
                 </div>
             </div>

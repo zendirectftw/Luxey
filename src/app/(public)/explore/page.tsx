@@ -1,12 +1,68 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import ProductCard from "@/components/ProductCard";
-import { sampleProducts, categories, weightFilters } from "@/data/products";
 import { useFavorites } from "@/context/FavoritesContext";
 
+interface ProductPricing {
+    productId: string;
+    productName: string;
+    productSlug: string;
+    metal: string;
+    weightOz: number;
+    purity: number;
+    imageUrl: string;
+    category: string;
+    mint: string | null;
+    bestBid: number;
+    bestAsk: number;
+    winningDealer: string;
+    winningDealerCity: string;
+}
+
+const CATEGORY_MAP: Record<string, string> = {
+    gold_bar: "Gold Bars",
+    gold_coin: "Gold Coins",
+    silver_bar: "Silver",
+    silver_coin: "Silver",
+    platinum_bar: "Platinum",
+    platinum_coin: "Platinum",
+};
+
+const WEIGHT_LABELS: Record<string, string> = {
+    "1": "1 oz",
+    "10": "10 oz",
+};
+
+const categories = ["All", "Gold Bars", "Gold Coins", "Silver", "Platinum"];
+const weightFilters = ["1 oz", "10 oz", "100gm"];
+
+function formatUSD(val: number): string {
+    if (val >= 1000) return "$" + val.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    return "$" + val.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function weightLabel(oz: number): string {
+    if (oz === 1) return "1 oz";
+    if (oz === 10) return "10 oz";
+    // Convert grams: 100g = 3.2151 oz
+    const grams = Math.round(oz * 31.1035);
+    if (grams === 100) return "100gm";
+    return `${oz} oz`;
+}
+
+function weightDisplay(oz: number): string {
+    if (oz === 1) return "1 Troy Oz";
+    if (oz === 10) return "10 Troy Oz";
+    const grams = Math.round(oz * 31.1035);
+    if (grams === 100) return "100 Grams";
+    return `${oz} Troy Oz`;
+}
+
 export default function ExplorePage() {
+    const [products, setProducts] = useState<ProductPricing[]>([]);
+    const [loading, setLoading] = useState(true);
     const [activeCategory, setActiveCategory] = useState("All");
     const [activeWeight, setActiveWeight] = useState<string | null>(null);
     const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
@@ -14,33 +70,55 @@ export default function ExplorePage() {
     const [sortBy, setSortBy] = useState("name");
     const { isFavorited, count: favCount } = useFavorites();
 
-    const filteredProducts = sampleProducts
-        .filter((p) => {
-            const matchesCategory =
-                activeCategory === "All" || p.category === activeCategory;
-            const matchesWeight =
-                !activeWeight || p.weightLabel === activeWeight;
-            const matchesFavorites =
-                !showFavoritesOnly || isFavorited(p.id);
-            const matchesSearch = p.name
-                .toLowerCase()
-                .includes(searchQuery.toLowerCase());
-            return matchesCategory && matchesWeight && matchesFavorites && matchesSearch;
-        })
-        .sort((a, b) => {
-            if (sortBy === "name") return a.name.localeCompare(b.name);
-            if (sortBy === "price-asc")
-                return (
-                    parseFloat(a.ask.replace(/[$,]/g, "")) -
-                    parseFloat(b.ask.replace(/[$,]/g, ""))
-                );
-            if (sortBy === "price-desc")
-                return (
-                    parseFloat(b.ask.replace(/[$,]/g, "")) -
-                    parseFloat(a.ask.replace(/[$,]/g, ""))
-                );
-            return 0;
-        });
+    useEffect(() => {
+        let active = true;
+        async function fetchPrices() {
+            try {
+                const res = await fetch("/api/product-prices");
+                const data = await res.json();
+                if (active && data.products) setProducts(data.products);
+            } catch { /* ignore */ } finally {
+                if (active) setLoading(false);
+            }
+        }
+        fetchPrices();
+        const interval = setInterval(fetchPrices, 15_000);
+        return () => { active = false; clearInterval(interval); };
+    }, []);
+
+    const filteredProducts = useMemo(() => {
+        return products
+            .map((p) => ({
+                ...p,
+                displayCategory: CATEGORY_MAP[p.category] || p.category,
+                wLabel: weightLabel(p.weightOz),
+                wDisplay: weightDisplay(p.weightOz),
+            }))
+            .filter((p) => {
+                const matchesCategory = activeCategory === "All" || p.displayCategory === activeCategory;
+                const matchesWeight = !activeWeight || p.wLabel === activeWeight;
+                const matchesFavorites = !showFavoritesOnly || isFavorited(p.productId);
+                const matchesSearch = p.productName.toLowerCase().includes(searchQuery.toLowerCase());
+                return matchesCategory && matchesWeight && matchesFavorites && matchesSearch;
+            })
+            .sort((a, b) => {
+                if (sortBy === "name") return a.productName.localeCompare(b.productName);
+                if (sortBy === "price-asc") return a.bestAsk - b.bestAsk;
+                if (sortBy === "price-desc") return b.bestAsk - a.bestAsk;
+                return 0;
+            });
+    }, [products, activeCategory, activeWeight, showFavoritesOnly, searchQuery, sortBy, isFavorited]);
+
+    if (loading) {
+        return (
+            <section className="max-w-7xl mx-auto w-full py-20 px-6 text-center">
+                <div className="animate-pulse">
+                    <div className="h-8 bg-gray-200 rounded w-48 mx-auto mb-4" />
+                    <div className="h-4 bg-gray-100 rounded w-64 mx-auto" />
+                </div>
+            </section>
+        );
+    }
 
     return (
         <section className="max-w-7xl mx-auto w-full py-10 px-6">
@@ -50,7 +128,7 @@ export default function ExplorePage() {
                     Marketplace
                 </h1>
                 <p className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400">
-                    Explore our catalog of certified precious metals
+                    Live bid/ask pricing · Updated every 15 seconds
                 </p>
             </header>
 
@@ -188,8 +266,21 @@ export default function ExplorePage() {
 
             {/* Product Grid */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
-                {filteredProducts.map((product) => (
-                    <ProductCard key={product.id} product={product} />
+                {filteredProducts.map((p) => (
+                    <ProductCard
+                        key={p.productId}
+                        product={{
+                            id: p.productId,
+                            name: p.productName,
+                            weight: p.wDisplay,
+                            weightLabel: p.wLabel,
+                            mint: p.mint || "",
+                            image: p.imageUrl || "",
+                            bid: formatUSD(p.bestBid),
+                            ask: formatUSD(p.bestAsk),
+                            category: p.displayCategory,
+                        }}
+                    />
                 ))}
             </div>
 

@@ -1,14 +1,92 @@
-export const metadata = { title: "Status Tier | Luxey© MyAccount" };
+"use client";
 
-const tiers = [
-    { name: "Bronze", volume: "$25k", fee: "0.75%", commission: "15%", level: "1st level", current: false },
-    { name: "Silver", volume: "$75k", fee: "0.70%", commission: "+10%", level: "2nd level", current: false },
-    { name: "Gold", volume: "$150k", fee: "0.60%", commission: "+5%", level: "3rd level", current: true },
-    { name: "Platinum", volume: "$300k", fee: "0.55%", commission: "+3%", level: "4th level", current: false },
-    { name: "Titanium", volume: "$500k", fee: "0.50%", commission: "+2%", level: "5th level", current: false },
-];
+import { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
+import { DEMO_USER_ID } from "@/lib/constants";
+
+interface TierConfig {
+    name: string;
+    volume_requirement: number;
+    platform_fee_pct: number;
+    eligible_level: number;
+    color: string;
+    sort_order: number;
+}
+
+interface CommissionRate {
+    level: number;
+    commission_rate: number;
+}
+
+interface MonthlyVolume {
+    month: string;
+    sell_volume: number;
+    tier_achieved: string;
+}
 
 export default function StatusPage() {
+    const [userTier, setUserTier] = useState("bronze");
+    const [tiers, setTiers] = useState<TierConfig[]>([]);
+    const [commRates, setCommRates] = useState<CommissionRate[]>([]);
+    const [volumes, setVolumes] = useState<MonthlyVolume[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        async function load() {
+            const [userRes, tierRes, commRes, volRes] = await Promise.all([
+                supabase.from("users").select("tier").eq("id", DEMO_USER_ID).single(),
+                supabase.from("tier_config").select("*").eq("visibility", "public").order("sort_order"),
+                supabase.from("commission_rates").select("level, commission_rate").order("level"),
+                supabase.from("user_monthly_volume").select("month, sell_volume, tier_achieved")
+                    .eq("user_id", DEMO_USER_ID).order("month", { ascending: false }).limit(2),
+            ]);
+
+            setUserTier(userRes.data?.tier || "bronze");
+            setTiers(tierRes.data || []);
+            setCommRates(commRes.data || []);
+            setVolumes(volRes.data || []);
+            setLoading(false);
+        }
+        load();
+    }, []);
+
+    if (loading) {
+        return (
+            <div className="max-w-7xl mx-auto w-full py-10 px-6">
+                <div className="flex items-center justify-center min-h-[400px]">
+                    <div className="w-8 h-8 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                </div>
+            </div>
+        );
+    }
+
+    const tierLabel = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
+    const fmt = (n: number) => "$" + n.toLocaleString("en-US", { minimumFractionDigits: 0 });
+
+    const currentTierConfig = tiers.find(t => t.name.toLowerCase() === userTier);
+    const lastMonth = volumes[0];
+    const thisMonth = volumes.length > 1 ? volumes[1] : volumes[0];
+
+    // Find next tier target for progress bar
+    const currentTierIdx = tiers.findIndex(t => t.name.toLowerCase() === userTier);
+    const currentVolume = thisMonth ? Number(thisMonth.sell_volume) : 0;
+    const currentThreshold = currentTierConfig?.volume_requirement || 25000;
+    const progressPct = Math.min(100, Math.round((currentVolume / currentThreshold) * 100));
+    const remaining = Math.max(0, currentThreshold - currentVolume);
+
+    const tierRows = tiers.map((t) => {
+        const comm = commRates.find(c => c.level === t.eligible_level);
+        const isCurrent = t.name.toLowerCase() === userTier;
+        return {
+            name: t.name,
+            volume: fmt(t.volume_requirement),
+            fee: t.platform_fee_pct.toFixed(2) + "%",
+            commission: (t.eligible_level === 1 ? "" : "+") + (comm?.commission_rate || 0) + "%",
+            level: `${t.eligible_level}${t.eligible_level === 1 ? "st" : t.eligible_level === 2 ? "nd" : t.eligible_level === 3 ? "rd" : "th"} level`,
+            current: isCurrent,
+        };
+    });
+
     return (
         <div className="max-w-7xl mx-auto w-full py-10 px-6">
             <header className="mb-10">
@@ -28,25 +106,27 @@ export default function StatusPage() {
                             YOUR CURRENT STATUS TIER:
                         </p>
                         <h2 className="font-serif text-8xl uppercase tracking-tighter italic color-gold leading-none pb-2">
-                            Gold
+                            {tierLabel(userTier)}
                         </h2>
                         <p className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest">
-                            Active until February 28th, 2026
+                            Based on your selling volume
                         </p>
                     </div>
                     <div className="flex flex-col gap-4 w-full md:w-auto">
-                        <div className="volume-box">
-                            <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-1">Volume Last Month</p>
-                            <p className="text-2xl font-black text-white tracking-tighter">
-                                $185,232 <span className="color-gold text-[10px] font-bold ml-1 uppercase">(Gold)</span>
-                            </p>
-                        </div>
+                        {lastMonth && (
+                            <div className="volume-box">
+                                <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-1">Volume Last Month</p>
+                                <p className="text-2xl font-black text-white tracking-tighter">
+                                    {fmt(Number(lastMonth.sell_volume))} <span className="color-gold text-[10px] font-bold ml-1 uppercase">({tierLabel(lastMonth.tier_achieved)})</span>
+                                </p>
+                            </div>
+                        )}
                         <div className="volume-box border-[#D4AF37]/40 bg-zinc-900/50 shadow-[0_0_15px_rgba(212,175,55,0.1)]">
                             <p className="text-[9px] font-black uppercase tracking-widest color-gold mb-1">
                                 Volume This Month So Far
                             </p>
                             <p className="text-2xl font-black text-white tracking-tighter">
-                                $84,434 <span className="text-zinc-500 text-[10px] font-bold ml-1 uppercase">(Silver)</span>
+                                {fmt(currentVolume)} <span className="text-zinc-500 text-[10px] font-bold ml-1 uppercase">({tierLabel(thisMonth?.tier_achieved || userTier)})</span>
                             </p>
                         </div>
                     </div>
@@ -57,16 +137,16 @@ export default function StatusPage() {
                     <div className="flex justify-between items-end mb-4 text-left w-full">
                         <div>
                             <p className="text-[11px] font-black uppercase tracking-widest color-gold">
-                                NEXT MILESTONE: MAINTAIN GOLD UNTIL END OF MARCH 2026.
+                                NEXT MILESTONE: MAINTAIN {tierLabel(userTier).toUpperCase()}
                             </p>
                             <p className="text-sm font-medium text-zinc-400 mt-1 uppercase tracking-tight">
-                                You need <span className="text-white font-black">$65,566</span> more to hit Gold Tier this month.
+                                You need <span className="text-white font-black">{fmt(remaining)}</span> more to hit {tierLabel(userTier)} Tier this month.
                             </p>
                         </div>
-                        <p className="text-xs font-black tracking-widest text-white uppercase">$150,000</p>
+                        <p className="text-xs font-black tracking-widest text-white uppercase">{fmt(currentThreshold)}</p>
                     </div>
                     <div className="progress-track">
-                        <div className="progress-fill" style={{ width: "56%" }} />
+                        <div className="progress-fill" style={{ width: `${progressPct}%` }} />
                     </div>
                 </div>
 
@@ -92,7 +172,7 @@ export default function StatusPage() {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-[#F5F5F5]">
-                            {tiers.map((tier) => (
+                            {tierRows.map((tier) => (
                                 <tr
                                     key={tier.name}
                                     className={`tier-row transition-all duration-300 ${tier.current ? "bg-amber-50/30 border-l-4 border-[#D4AF37]" : ""
@@ -100,7 +180,7 @@ export default function StatusPage() {
                                 >
                                     <td className="px-8 py-6">
                                         <div className="flex items-center gap-3">
-                                            <span className={`font-bold text-sm uppercase ${tier.name === "Titanium" ? "text-zinc-400" : "text-black"} ${tier.current ? "font-black" : ""}`}>
+                                            <span className={`font-bold text-sm uppercase ${tier.current ? "font-black" : ""}`}>
                                                 {tier.name}
                                             </span>
                                             {tier.current && (

@@ -1,13 +1,68 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useFavorites } from "@/context/FavoritesContext";
-import { sampleProducts } from "@/data/products";
 import ProductCard from "@/components/ProductCard";
+import { supabase } from "@/lib/supabase";
+
+interface Product {
+    id: string;
+    name: string;
+    slug: string;
+    metal: string;
+    category: string;
+    weight_oz: number;
+    purity: number;
+    mint: string | null;
+    year: number | null;
+    image_url: string | null;
+    is_active: boolean;
+}
 
 export default function FavoritesPage() {
     const { favorites } = useFavorites();
-    const favoritedProducts = sampleProducts.filter(p => favorites.has(p.id));
+    const [products, setProducts] = useState<Product[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        async function load() {
+            const { data } = await supabase
+                .from("products")
+                .select("*")
+                .eq("is_active", true)
+                .order("name");
+
+            setProducts(data || []);
+            setLoading(false);
+        }
+        load();
+    }, []);
+
+    const favoritedProducts = products.filter(p => favorites.has(p.id));
+
+    // Map to ProductCard expected shape
+    const mappedProducts = favoritedProducts.map(p => ({
+        id: p.id,
+        name: p.name,
+        weight: `${p.weight_oz} oz`,
+        weightLabel: `${p.weight_oz} Troy Ounce`,
+        mint: p.mint || "",
+        image: p.image_url || "",
+        bid: "—",
+        ask: "—",
+        category: p.category,
+    }));
+
+    if (loading) {
+        return (
+            <section className="max-w-7xl mx-auto w-full py-8 px-6">
+                <div className="flex items-center justify-center min-h-[300px]">
+                    <div className="w-8 h-8 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                </div>
+            </section>
+        );
+    }
 
     return (
         <>
@@ -31,9 +86,9 @@ export default function FavoritesPage() {
                     </p>
                 </header>
 
-                {favoritedProducts.length > 0 ? (
+                {mappedProducts.length > 0 ? (
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
-                        {favoritedProducts.map(product => (
+                        {mappedProducts.map(product => (
                             <ProductCard key={product.id} product={product} />
                         ))}
                     </div>
