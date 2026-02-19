@@ -72,8 +72,8 @@ function TradingViewChart({ symbol, interval, range }: { symbol: string; interva
     }, [symbol, interval, range]);
 
     return (
-        <div className="tradingview-widget-container h-[400px]" ref={containerRef}>
-            <div className="tradingview-widget-container__widget h-full" />
+        <div className="tradingview-widget-container" style={{ height: "400px", minHeight: "400px" }} ref={containerRef}>
+            <div className="tradingview-widget-container__widget" style={{ height: "100%", width: "100%" }} />
         </div>
     );
 }
